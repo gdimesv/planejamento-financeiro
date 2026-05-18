@@ -385,16 +385,17 @@ def relatorio_tab(cliente_id: str) -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Planejamento Financeiro", layout="wide")
-    st.title("Planejamento Financeiro - UI unica")
+    st.title("Planejamento Financeiro")
 
     clientes = list_clientes()
     if not clientes:
         st.error("Nenhum cliente encontrado em 'clientes/'.")
         return
 
-    cliente_id = st.selectbox("Cliente", options=clientes)
+    with st.sidebar:
+        cliente_id = st.selectbox("Cliente", options=clientes)
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["1) Upload Mensal", "2) Objetivos", "3) Classificacao de Ativos", "4) Relatorio"]
+        ["Upload mensal", "Objetivos", "Classificação de ativos", "Relatório"]
     )
     with tab1:
         upload_tab(cliente_id)
