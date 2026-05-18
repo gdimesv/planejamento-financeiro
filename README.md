@@ -1,5 +1,7 @@
 # Planejamento Financeiro Local (V0)
 
+App de planejamento financeiro que me ajuda a organizar minhas financas.
+
 Aplicativo local em Python para gerar um relatorio mensal por cliente, com base em objetivos e arquivos de extrato/posicao.
 
 ## Como rodar
