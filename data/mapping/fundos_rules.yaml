@@ -1,0 +1,47 @@
+defaults:
+  classe_macro: "Fundos"
+  subclasse: "Fundo Outros"
+  confianca: "baixa"
+
+rules:
+  - match_type: contains
+    field: ativo
+    value: "Privatização"
+    subclasse: "Fundo RV"
+    confianca: "alta"
+
+  - match_type: contains
+    field: ativo
+    value: "RF"
+    subclasse: "Fundo RF"
+    confianca: "alta"
+
+  - match_type: contains
+    field: ativo
+    value: "FIRF"
+    subclasse: "Fundo RF"
+    confianca: "alta"
+
+  - match_type: contains
+    field: ativo
+    value: "DI"
+    subclasse: "Fundo RF"
+    confianca: "alta"
+
+  - match_type: regex
+    field: ativo
+    value: "(?i)(?:acoes|equities|long only)"
+    subclasse: "Fundo RV"
+    confianca: "media"
+
+  - match_type: contains
+    field: ativo
+    value: "Cambial"
+    subclasse: "Fundo Cambial"
+    confianca: "media"
+
+  - match_type: contains
+    field: ativo
+    value: "Multimercado"
+    subclasse: "Fundo Multimercado"
+    confianca: "media"

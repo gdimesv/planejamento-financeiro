@@ -1,0 +1,5 @@
+pandas
+openpyxl
+pyyaml
+jinja2
+streamlit
