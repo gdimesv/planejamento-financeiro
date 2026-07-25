@@ -498,6 +498,116 @@ def normalize_fii_recommendations(df: pd.DataFrame) -> pd.DataFrame:
     return out[columns]
 
 
+def normalize_stock_recommendations(df: pd.DataFrame) -> pd.DataFrame:
+    """Mesma normalizacao de normalize_fii_recommendations; nomeada em separado
+    para deixar explicito que alimenta a carteira de acoes (Dividendos) da Suno."""
+    return normalize_fii_recommendations(df)
+
+
+def build_stock_recommendation_actions(df_m0: pd.DataFrame, recommendation_df: pd.DataFrame) -> Dict[str, object]:
+    empty = {
+        "disponivel": False,
+        "acoes": [],
+        "resumo": {"comprar": 0, "aumentar": 0, "aguardar": 0, "reduzir": 0, "encerrar": 0},
+    }
+    recs = normalize_stock_recommendations(recommendation_df)
+    if recs.empty:
+        return empty
+
+    current = df_m0.copy()
+    if current.empty:
+        current = pd.DataFrame(columns=["ativo", "classe_macro", "quantidade", "valor_total"])
+    class_col = "classe_macro" if "classe_macro" in current.columns else "classe_ativo"
+    if class_col in current.columns:
+        current = current[current[class_col].apply(_normalize_text).eq("acoes")]
+    else:
+        current = current.iloc[0:0]
+
+    current["ticker"] = current["ativo"].apply(_extract_ticker) if "ativo" in current.columns else ""
+    current_by_ticker = (
+        current.groupby("ticker", dropna=False)
+        .agg(
+            ativo_carteira=("ativo", "first"),
+            quantidade=("quantidade", "sum"),
+            valor_atual=("valor_total", "sum"),
+        )
+        .reset_index()
+        if not current.empty
+        else pd.DataFrame(columns=["ticker", "ativo_carteira", "quantidade", "valor_atual"])
+    )
+
+    joined = recs.merge(current_by_ticker, how="left", on="ticker")
+    joined["quantidade"] = pd.to_numeric(joined["quantidade"], errors="coerce").fillna(0.0)
+    joined["valor_atual"] = pd.to_numeric(joined["valor_atual"], errors="coerce").fillna(0.0)
+    joined["em_carteira"] = joined["valor_atual"] > 0
+
+    rows: List[Dict[str, object]] = []
+    for _, row in joined.iterrows():
+        recomendado = bool(row["recomendado"])
+        em_carteira = bool(row["em_carteira"])
+        vies_norm = _normalize_text(row.get("vies", ""))
+
+        if not recomendado and em_carteira:
+            acao = "Encerrar posicao"
+            prioridade = 1
+            motivo = "Rank vazio no arquivo de recomendacao; o ativo deixou de ser recomendado."
+        elif not recomendado:
+            acao = "Fora da carteira recomendada"
+            prioridade = 5
+            motivo = "Rank vazio no arquivo de recomendacao e ativo nao consta na carteira atual."
+        elif "compr" in vies_norm and em_carteira:
+            acao = "Aumentar posicao"
+            prioridade = 2
+            motivo = "Ativo segue recomendado com vies Comprar e ja esta na carteira."
+        elif "compr" in vies_norm:
+            acao = "Comprar"
+            prioridade = 2
+            motivo = "Ativo recomendado com vies Comprar e ainda nao esta na carteira."
+        elif "aguard" in vies_norm and em_carteira:
+            acao = "Reduzir / nao aumentar"
+            prioridade = 3
+            motivo = "Ativo segue no ranking, mas o vies atual e Aguardar."
+        elif "aguard" in vies_norm:
+            acao = "Aguardar"
+            prioridade = 4
+            motivo = "Ativo recomendado no ranking, mas com vies Aguardar."
+        elif recomendado and em_carteira:
+            acao = "Manter"
+            prioridade = 4
+            motivo = "Ativo esta no ranking, sem vies reconhecido como Comprar ou Aguardar."
+        else:
+            acao = "Monitorar"
+            prioridade = 5
+            motivo = "Ativo esta no ranking, sem vies reconhecido como Comprar ou Aguardar."
+
+        rows.append(
+            {
+                "rank": "" if pd.isna(row.get("rank")) else row.get("rank"),
+                "rank_num": float(row["rank_num"]) if not pd.isna(row["rank_num"]) else 9999.0,
+                "ativo": str(row.get("ativo", "")),
+                "ticker": str(row.get("ticker", "")),
+                "vies": str(row.get("vies", "")),
+                "em_carteira": em_carteira,
+                "quantidade": float(row["quantidade"]),
+                "valor_atual": float(row["valor_atual"]),
+                "acao": acao,
+                "prioridade": prioridade,
+                "motivo": motivo,
+            }
+        )
+
+    resumo = {
+        "comprar": sum(1 for row in rows if row["acao"] == "Comprar"),
+        "aumentar": sum(1 for row in rows if row["acao"] == "Aumentar posicao"),
+        "aguardar": sum(1 for row in rows if row["acao"] in {"Aguardar", "Manter"}),
+        "reduzir": sum(1 for row in rows if row["acao"] == "Reduzir / nao aumentar"),
+        "encerrar": sum(1 for row in rows if row["acao"] == "Encerrar posicao"),
+    }
+
+    rows = sorted(rows, key=lambda row: (int(row["prioridade"]), float(row["rank_num"]), str(row["ticker"])))
+    return {"disponivel": True, "acoes": rows, "resumo": resumo}
+
+
 def build_fii_recommendation_actions(df_m0: pd.DataFrame, recommendation_df: pd.DataFrame) -> Dict[str, object]:
     empty = {
         "disponivel": False,

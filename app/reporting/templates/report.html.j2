@@ -334,6 +334,68 @@
       </article>
     </section>
 
+    <section class="section" aria-label="Carteira recomendada de Ações (Dividendos)">
+      <article class="card">
+        <h2>Carteira recomendada de Ações (Dividendos)</h2>
+        {% if recomendacoes_acoes.disponivel %}
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-label">Comprar</div>
+            <div class="summary-value positive">{{ recomendacoes_acoes.resumo.comprar }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Aumentar</div>
+            <div class="summary-value positive">{{ recomendacoes_acoes.resumo.aumentar }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Reduzir / aguardar</div>
+            <div class="summary-value">{{ recomendacoes_acoes.resumo.reduzir }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Encerrar</div>
+            <div class="summary-value negative">{{ recomendacoes_acoes.resumo.encerrar }}</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <tr>
+              <th>Ação sugerida</th>
+              <th class="num">Rank</th>
+              <th>Ativo</th>
+              <th>Viés</th>
+              <th>Na carteira?</th>
+              <th class="num">Valor atual</th>
+              <th>Motivo</th>
+            </tr>
+            {% for linha in recomendacoes_acoes.acoes %}
+            <tr>
+              <td>
+                {% if linha.acao in ["Comprar", "Aumentar posicao"] %}
+                <span class="badge badge-buy">{{ fii_action_label(linha.acao) }}</span>
+                {% elif linha.acao in ["Encerrar posicao"] %}
+                <span class="badge badge-sell">{{ fii_action_label(linha.acao) }}</span>
+                {% elif linha.acao in ["Aguardar", "Reduzir / nao aumentar"] %}
+                <span class="badge badge-wait">{{ fii_action_label(linha.acao) }}</span>
+                {% else %}
+                <span class="badge badge-neutral">{{ fii_action_label(linha.acao) }}</span>
+                {% endif %}
+              </td>
+              <td class="num">{{ linha.rank }}</td>
+              <td>{{ linha.ticker }}</td>
+              <td>{{ linha.vies }}</td>
+              <td>{% if linha.em_carteira %}Sim{% else %}Não{% endif %}</td>
+              <td class="num">{{ linha.valor_atual|brl }}</td>
+              <td>{{ linha.motivo }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+        {% else %}
+        <p class="note">Nenhum arquivo de carteira recomendada de ações encontrado para este mês.</p>
+        {% endif %}
+      </article>
+    </section>
+
     <section class="section" aria-label="Ativos novos sem classificação">
       <article class="card">
         <h2>Ativos novos sem classificação</h2>

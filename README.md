@@ -44,6 +44,34 @@ Arquivos gerados:
 - `clientes/<cliente>/objetivos.yaml`
 - `clientes/<cliente>/config/asset_objective_map.csv`
 
+## Carteira recomendada de FIIs (Suno)
+
+O script em `scripts/suno-fiis/` automatiza a coleta da carteira recomendada de FIIs da Suno (login manual, sessao fica salva em `scripts/suno-fiis/.suno-session/`).
+
+Requisitos (uma vez): `cd scripts/suno-fiis && npm install && npx playwright install chromium`.
+
+Uso mensal:
+
+```bash
+./scripts/suno-fiis/run-suno-fiis.sh --cliente gabriel --mes 2026-07
+```
+
+Abre um Chromium; faca login na Suno se pedido e deixe a pagina `carteiras/fiis` aberta. O CSV e salvo automaticamente em `clientes/<cliente>/inputs/<mes>/fii_recomendados_<mes>.csv`.
+
+## Carteira recomendada de Ações / Dividendos (Suno)
+
+O script em `scripts/suno-acoes/` automatiza a coleta da carteira recomendada de Dividendos (ações) da Suno (login manual, sessao propria salva em `scripts/suno-acoes/.suno-session/`, separada da sessao do scraper de FIIs).
+
+Requisitos (uma vez): `cd scripts/suno-acoes && npm install` (reaproveita o Chromium ja instalado pelo Playwright do `suno-fiis`; se ainda nao tiver nenhum, rode tambem `npx playwright install chromium`).
+
+Uso mensal:
+
+```bash
+./scripts/suno-acoes/run-suno-acoes.sh --cliente gabriel --mes 2026-07
+```
+
+Abre um Chromium; faca login na Suno se pedido e deixe a pagina `carteiras/dividendos` aberta. O CSV e salvo automaticamente em `clientes/<cliente>/inputs/<mes>/acoes_recomendadas_<mes>.csv`. O relatorio compara esse arquivo com a posicao atual de Ações e gera a aba "Carteira recomendada de Ações (Dividendos)" com as mesmas sugestoes (comprar, aumentar, reduzir/nao aumentar, aguardar ou encerrar) usadas para FIIs.
+
 ## Formato dos inputs
 
 Em **`clientes/<cliente>/inputs/<YYYY-MM>/`** voce guarda **so o mes de referencia** (recorrente):
@@ -51,6 +79,7 @@ Em **`clientes/<cliente>/inputs/<YYYY-MM>/`** voce guarda **so o mes de referenc
 - `extrato_*.csv|xlsx` — extrato do mes
 - `posicao_m0_*.csv|xlsx` — posicao de fechamento **desse** mes (XP, etc.)
 - `carteira_*fii*recomend*.csv|xlsx` ou `*fii*carteira*.csv|xlsx` — carteira recomendada de FIIs do mes
+- `acoes_recomendadas_*.csv|xlsx` (nome com `acoes` + `recomend` ou `carteira`) — carteira recomendada de Ações/Dividendos do mes
 - Opcional: CSV internacional com `m0` no nome, mesmo mes
 
 ### Carteira recomendada de FIIs
@@ -62,6 +91,16 @@ O arquivo de FIIs deve ter ao menos:
 - `Vies` — `Comprar` ou `Aguardar`
 
 O relatorio compara esse arquivo com a posicao atual de FIIs e gera sugestoes de comprar, aumentar, reduzir/nao aumentar, aguardar ou encerrar.
+
+### Carteira recomendada de Ações
+
+O arquivo de Ações (gerado por `scripts/suno-acoes/`) segue o mesmo formato do de FIIs:
+
+- `Rank` — quando vazio, o ativo deixou de ser recomendado; se estiver na carteira atual, o relatorio sugere encerrar a posicao
+- `Ativo`/`Ticker`/`Codigo` — ticker da ação
+- `Vies` — `Comprar` ou `Aguardar`
+
+O relatorio compara esse arquivo com a posicao atual de Ações (`classe_ativo`/`classe_macro` = "Ações") e gera a mesma logica de sugestoes usada para FIIs.
 
 **Variacao MoM (M1):** nao e necessario colocar arquivos `m1` na pasta do mes atual. O sistema busca automaticamente a posicao do mes anterior na pasta **`inputs/<mes-anterior>/`**, usando os arquivos de posicao (`m0`) que voce ja salvou naquele mes.
 
