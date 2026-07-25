@@ -28,551 +28,564 @@
       {{ action }}
     {%- endif -%}
   {%- endmacro %}
+  {% macro badge_class(action) -%}
+    {%- if action in ["Comprar", "Aumentar posicao"] -%}badge-buy
+    {%- elif action in ["Encerrar posicao"] -%}badge-sell
+    {%- elif action in ["Aguardar", "Reduzir / nao aumentar"] -%}badge-wait
+    {%- else -%}badge-neutral
+    {%- endif -%}
+  {%- endmacro %}
+  {% macro recommendation_toggle_list(groups) -%}
+  <div class="toggle-group-list">
+    {% for group in groups %}
+    <details class="toggle-group"{% if group.default_open %} open{% endif %}>
+      <summary class="toggle-summary">
+        <span class="badge {{ badge_class(group.acao) }}">{{ fii_action_label(group.acao) }}</span>
+        <span class="toggle-count">{{ group.count }} ativo(s)</span>
+        <span class="toggle-value">{{ group.valor_total|brl }}</span>
+      </summary>
+      {% if group.motivo_comum %}
+      <p class="toggle-motivo">{{ group.motivo_comum }}</p>
+      {% endif %}
+      <div class="table-wrap">
+        <table>
+          <tr>
+            <th class="num">Rank</th>
+            <th>Ativo</th>
+            <th>Viés</th>
+            <th>Na carteira?</th>
+            <th class="num">Valor atual</th>
+            <th>Observação</th>
+          </tr>
+          {% for linha in group.rows %}
+          <tr>
+            <td class="num">{{ linha.rank }}</td>
+            <td>{{ linha.ticker }}</td>
+            <td>{{ linha.vies }}</td>
+            <td>{% if linha.em_carteira %}Sim{% else %}Não{% endif %}</td>
+            <td class="num">{{ linha.valor_atual|brl }}</td>
+            <td>{{ linha.motivo_diferente }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+  {%- endmacro %}
 
-  <main class="page">
-    <header class="report-header">
-      <div>
+  <div class="layout">
+    <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav-list">☰ Navegar pelo relatório</button>
+    <ul class="mobile-nav-list" id="mobile-nav-list">
+      <li><a href="#resumo" data-section="resumo">📊 Resumo</a></li>
+      <li><a href="#leitura" data-section="leitura">🧭 Leitura do mês</a></li>
+      <li><a href="#plano" data-section="plano">✅ Plano de ação</a></li>
+      <li><a href="#objetivos" data-section="objetivos">🎯 Objetivos</a></li>
+      <li><a href="#diagnostico" data-section="diagnostico">📈 Diagnóstico da carteira</a></li>
+      <li><a href="#posicao" data-section="posicao">💼 Posição atual</a></li>
+      <li><a href="#movimentos" data-section="movimentos">🔁 Compras e vendas</a></li>
+      <li><a href="#fiis" data-section="fiis">🏢 Carteira de FIIs</a></li>
+      <li><a href="#acoes" data-section="acoes">📈 Carteira de Ações</a></li>
+      <li><a href="#novos" data-section="novos">🆕 Ativos novos</a></li>
+      <li><a href="#fluxos" data-section="fluxos">💰 Fluxos</a></li>
+      <li><a href="#mom" data-section="mom">📆 Variação MoM</a></li>
+      <li><a href="#macro" data-section="macro">🌐 Rentabilidade e macro</a></li>
+    </ul>
+
+    <aside class="sidebar">
+      <div class="sidebar-brand">
         <p class="eyebrow">Relatório financeiro mensal</p>
         <h1>{{ cliente_nome }}</h1>
-        <div class="header-meta">Mês de referência: <strong>{{ mes }}</strong></div>
+        <div class="sidebar-meta">Mês de referência <strong>{{ mes }}</strong></div>
       </div>
-      <div class="header-pill">Gerado localmente</div>
-    </header>
+      <nav class="sidebar-nav">
+        <a href="#resumo" data-section="resumo">📊 Resumo</a>
+        <a href="#leitura" data-section="leitura">🧭 Leitura do mês</a>
+        <a href="#plano" data-section="plano">✅ Plano de ação</a>
+        <a href="#objetivos" data-section="objetivos">🎯 Objetivos</a>
+        <a href="#diagnostico" data-section="diagnostico">📈 Diagnóstico da carteira</a>
+        <a href="#posicao" data-section="posicao">💼 Posição atual</a>
+        <a href="#movimentos" data-section="movimentos">🔁 Compras e vendas</a>
+        <a href="#fiis" data-section="fiis">🏢 Carteira de FIIs</a>
+        <a href="#acoes" data-section="acoes">📈 Carteira de Ações</a>
+        <a href="#novos" data-section="novos">🆕 Ativos novos</a>
+        <a href="#fluxos" data-section="fluxos">💰 Fluxos</a>
+        <a href="#mom" data-section="mom">📆 Variação MoM</a>
+        <a href="#macro" data-section="macro">🌐 Rentabilidade e macro</a>
+      </nav>
+      <div class="sidebar-footer">Gerado localmente</div>
+    </aside>
 
-    <section class="section" aria-label="Resumo executivo">
-      <div class="kpi-grid">
-        {% for item in view.kpis %}
-        <article class="kpi">
-          <div class="kpi-label">{{ item.label }}</div>
-          <div class="kpi-value {{ item.tone }}">{{ metric_value(item) }}</div>
-          <div class="kpi-context">
-            {% if item.context_value is defined %}
-              {{ item.context_value|pct }}
-            {% else %}
-              {{ item.context }}
-            {% endif %}
-          </div>
-        </article>
-        {% endfor %}
-      </div>
-    </section>
-
-    <section class="section" aria-label="Leitura do mês">
-      <div class="section-header">
-        <h2>Leitura do mês</h2>
-        <div class="section-kicker">Como estou, o que mudou e qual é a próxima ação.</div>
-      </div>
-      <div class="insight-grid">
-        {% for insight in view.insights %}
-        <article class="insight">
-          <div class="insight-label">{{ insight.label }}</div>
-          <div class="insight-title {{ insight.tone }}">{{ insight.title }}</div>
-          <div class="insight-detail">{{ insight.detail }}</div>
-        </article>
-        {% endfor %}
-      </div>
-    </section>
-
-    <section class="section" aria-label="Plano de ação">
-      <div class="section-header">
-        <h2>Plano de ação</h2>
-        <div class="section-kicker">Decisões sugeridas para o próximo aporte.</div>
-      </div>
-      <div class="decision-grid">
-        <article class="panel">
-          <h3>Sugestão de investimento para o mês</h3>
-          {% if view.action_plan %}
-          <div class="action-list">
-            {% for s in view.action_plan %}
-            <div class="action-item">
-              <div>
-                <div class="action-title">{{ s.descricao }}</div>
-                <div class="action-meta">Prioridade {{ s.prioridade }} · impacto estimado de {{ s.impacto_gap_pct|pct }} no gap</div>
-              </div>
-              <div class="action-value">{{ s.aporte_sugerido|brl }}</div>
-            </div>
-            {% endfor %}
-          </div>
-          {% else %}
-          <p class="note">Nenhum aporte sugerido para este mês.</p>
-          {% endif %}
-        </article>
-
-        <article class="panel">
-          <h3>Movimentos planejados</h3>
-          {% if movimentos_planejados %}
-          <div class="planned-moves">{{ movimentos_planejados }}</div>
-          {% else %}
-          <p class="note">Nenhum movimento planejado registrado para este mês.</p>
-          {% endif %}
-        </article>
-      </div>
-    </section>
-
-    <section class="section" aria-label="Objetivos">
-      <div class="section-header">
-        <h2>Objetivos</h2>
-        <div class="section-kicker">Acompanhamento por mapeamento de ativos.</div>
-      </div>
-      <article class="panel">
-        {% if view.goal_cards %}
-        <div class="goal-list">
-          {% for g in view.goal_cards %}
-          <div class="goal-card">
-            <div>
-              <div class="action-title">{{ g.descricao }}</div>
-              <div class="action-meta">{{ g.status }} · prioridade {{ g.prioridade }}</div>
-              <div class="progress-track" aria-label="Progresso de {{ g.descricao }}">
-                <div class="progress-fill" style="width: {{ g.progresso_visual }}%;"></div>
-              </div>
-            </div>
-            <div class="goal-stats">
-              <span>{{ g.valor_atual_estimado|brl }} de {{ g.valor_alvo|brl }}</span>
-              <span>{{ g.progresso_pct|pct }} concluído</span>
-              <span>Gap: {{ g.gap|brl }}</span>
-              {% if g.aporte_sugerido > 0 %}
-              <span>Aporte: {{ g.aporte_sugerido|brl }}{% if g.meses_estimados %} · {{ g.meses_estimados }} meses{% endif %}</span>
+    <main class="content">
+      <section class="section" id="resumo" aria-label="Resumo executivo">
+        <div class="kpi-grid">
+          {% for item in view.kpis %}
+          <article class="kpi">
+            <div class="kpi-label">{{ item.label }}</div>
+            <div class="kpi-value {{ item.tone }}">{{ metric_value(item) }}</div>
+            <div class="kpi-context">
+              {% if item.context_value is defined %}
+                {{ item.context_value|pct }}
+              {% else %}
+                {{ item.context }}
               {% endif %}
             </div>
-          </div>
+          </article>
           {% endfor %}
         </div>
-        {% else %}
-        <p class="note">Nenhum objetivo cadastrado.</p>
-        {% endif %}
-      </article>
-    </section>
+      </section>
 
-    <section class="section" aria-label="Alocação e variação">
-      <div class="section-header">
-        <h2>Diagnóstico da carteira</h2>
-        <div class="section-kicker">Alocação atual e variação por classe.</div>
-      </div>
-      <div class="analytics-grid">
-        <article class="panel">
-          <h3>Alocação por classe</h3>
-          <div class="bar-list">
-            {% for row in view.allocation_chart %}
-            <div class="bar-row">
-              <div class="bar-label">{{ row.classe }}</div>
-              <div class="bar-track">
-                <div class="bar-fill" style="width: {{ row.width }}%;"></div>
-              </div>
-              <div class="bar-value">{{ row.percentual|pct }}</div>
-            </div>
-            {% endfor %}
-          </div>
-        </article>
-
-        <article class="panel">
-          <h3>Variação mensal por classe</h3>
-          <div class="bar-list">
-            {% for row in view.variation_chart %}
-            <div class="bar-row">
-              <div class="bar-label">{{ row.classe }}</div>
-              <div class="bar-track">
-                <div class="bar-fill {{ row.tone }}" style="width: {{ row.width }}%;"></div>
-              </div>
-              <div class="bar-value {{ row.tone }}">{{ row.valor|brl }} · {{ row.delta_label }}</div>
-            </div>
-            {% endfor %}
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="section" aria-label="Posição atual">
-      <article class="card">
-        <h2>Posição atual</h2>
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="summary-label">Patrimônio investido</div>
-            <div class="summary-value">{{ posicao.investido|brl }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Caixa disponível</div>
-            <div class="summary-value">{{ posicao.caixa|brl }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Patrimônio total</div>
-            <div class="summary-value">{{ posicao.total|brl }}</div>
-          </div>
+      <section class="section" id="leitura" aria-label="Leitura do mês">
+        <div class="section-header">
+          <h2>Leitura do mês</h2>
+          <div class="section-kicker">Como estou, o que mudou e qual é a próxima ação.</div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <tr>
-              <th>Classe</th>
-              <th>Subclasse</th>
-              <th class="num">M0</th>
-              <th class="num">M1</th>
-              <th class="num">Variação</th>
-              <th class="num">Variação %</th>
-              <th class="num">Representatividade</th>
-            </tr>
-            {% for linha in posicao.alocacao_tabela %}
-            <tr>
-              <td>{{ linha.classe }}</td>
-              <td>{{ linha.subclasse }}</td>
-              <td class="num">{{ linha.m0|brl }}</td>
-              <td class="num">{{ linha.m1|brl }}</td>
-              <td class="num {{ 'positive' if linha.variacao > 0 else 'negative' if linha.variacao < 0 else 'neutral' }}">{{ linha.variacao|brl }}</td>
-              <td class="num {{ 'positive' if linha.variacao_pct > 0 else 'negative' if linha.variacao_pct < 0 else 'neutral' }}">{{ linha.variacao_pct|pct }}</td>
-              <td class="num">{{ linha.representatividade_pct|pct }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-      </article>
-    </section>
-
-    <section class="section" aria-label="Compras e vendas">
-      <article class="card">
-        <h2>Compras e vendas identificadas</h2>
-        {% if compras_vendas.total_movimentos %}
-        <p class="note">Resumo calculado pela variação entre M1 e M0. Ativos sem quantidade informada aparecem como aumento ou redução por valor.</p>
-        <div class="movement-grid">
-          <div class="movement-panel">
-            <h3 class="positive">Compras / aumentos</h3>
-            <p><strong>{{ compras_vendas.compras.quantidade }}</strong> movimento(s), total estimado de <strong>{{ compras_vendas.compras.valor_total|brl }}</strong>.</p>
-            {% if compras_vendas.compras.principais %}
-            <ul class="movement-list">
-              {% for linha in compras_vendas.compras.principais %}
-              <li>
-                <div>
-                  <div class="movement-name">{{ linha.ativo }}</div>
-                  <div class="movement-detail">{{ linha.tipo }}{% if linha.delta_quantidade %} · qtd {{ linha.delta_quantidade }}{% endif %}</div>
-                </div>
-                <div class="movement-value positive">{{ linha.delta_valor|brl }}</div>
-              </li>
-              {% endfor %}
-            </ul>
-            {% endif %}
-          </div>
-          <div class="movement-panel">
-            <h3 class="negative">Vendas / reduções</h3>
-            <p><strong>{{ compras_vendas.vendas.quantidade }}</strong> movimento(s), total estimado de <strong>{{ compras_vendas.vendas.valor_total|brl }}</strong>.</p>
-            {% if compras_vendas.vendas.principais %}
-            <ul class="movement-list">
-              {% for linha in compras_vendas.vendas.principais %}
-              <li>
-                <div>
-                  <div class="movement-name">{{ linha.ativo }}</div>
-                  <div class="movement-detail">{{ linha.tipo }}{% if linha.delta_quantidade %} · qtd {{ linha.delta_quantidade|abs }}{% endif %}</div>
-                </div>
-                <div class="movement-value negative">{{ linha.delta_valor|brl }}</div>
-              </li>
-              {% endfor %}
-            </ul>
-            {% endif %}
-          </div>
-        </div>
-        {% else %}
-        <p class="note">Nenhuma compra ou venda identificada pela comparação de posições.</p>
-        {% endif %}
-      </article>
-    </section>
-
-    <section class="section" aria-label="Carteira recomendada de FIIs">
-      <article class="card">
-        <h2>Carteira recomendada de FIIs</h2>
-        {% if recomendacoes_fii.disponivel %}
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="summary-label">Comprar</div>
-            <div class="summary-value positive">{{ recomendacoes_fii.resumo.comprar }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Aumentar</div>
-            <div class="summary-value positive">{{ recomendacoes_fii.resumo.aumentar }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Reduzir / aguardar</div>
-            <div class="summary-value">{{ recomendacoes_fii.resumo.reduzir }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Encerrar</div>
-            <div class="summary-value negative">{{ recomendacoes_fii.resumo.encerrar }}</div>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <tr>
-              <th>Ação sugerida</th>
-              <th class="num">Rank</th>
-              <th>Ativo</th>
-              <th>Viés</th>
-              <th>Na carteira?</th>
-              <th class="num">Valor atual</th>
-              <th>Motivo</th>
-            </tr>
-            {% for linha in recomendacoes_fii.acoes %}
-            <tr>
-              <td>
-                {% if linha.acao in ["Comprar", "Aumentar posicao"] %}
-                <span class="badge badge-buy">{{ fii_action_label(linha.acao) }}</span>
-                {% elif linha.acao in ["Encerrar posicao"] %}
-                <span class="badge badge-sell">{{ fii_action_label(linha.acao) }}</span>
-                {% elif linha.acao in ["Aguardar", "Reduzir / nao aumentar"] %}
-                <span class="badge badge-wait">{{ fii_action_label(linha.acao) }}</span>
-                {% else %}
-                <span class="badge badge-neutral">{{ fii_action_label(linha.acao) }}</span>
-                {% endif %}
-              </td>
-              <td class="num">{{ linha.rank }}</td>
-              <td>{{ linha.ticker }}</td>
-              <td>{{ linha.vies }}</td>
-              <td>{% if linha.em_carteira %}Sim{% else %}Não{% endif %}</td>
-              <td class="num">{{ linha.valor_atual|brl }}</td>
-              <td>{{ linha.motivo }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-        {% else %}
-        <p class="note">Nenhum arquivo de carteira recomendada de FIIs encontrado para este mês.</p>
-        {% endif %}
-      </article>
-    </section>
-
-    <section class="section" aria-label="Carteira recomendada de Ações (Dividendos)">
-      <article class="card">
-        <h2>Carteira recomendada de Ações (Dividendos)</h2>
-        {% if recomendacoes_acoes.disponivel %}
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="summary-label">Comprar</div>
-            <div class="summary-value positive">{{ recomendacoes_acoes.resumo.comprar }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Aumentar</div>
-            <div class="summary-value positive">{{ recomendacoes_acoes.resumo.aumentar }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Reduzir / aguardar</div>
-            <div class="summary-value">{{ recomendacoes_acoes.resumo.reduzir }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Encerrar</div>
-            <div class="summary-value negative">{{ recomendacoes_acoes.resumo.encerrar }}</div>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <tr>
-              <th>Ação sugerida</th>
-              <th class="num">Rank</th>
-              <th>Ativo</th>
-              <th>Viés</th>
-              <th>Na carteira?</th>
-              <th class="num">Valor atual</th>
-              <th>Motivo</th>
-            </tr>
-            {% for linha in recomendacoes_acoes.acoes %}
-            <tr>
-              <td>
-                {% if linha.acao in ["Comprar", "Aumentar posicao"] %}
-                <span class="badge badge-buy">{{ fii_action_label(linha.acao) }}</span>
-                {% elif linha.acao in ["Encerrar posicao"] %}
-                <span class="badge badge-sell">{{ fii_action_label(linha.acao) }}</span>
-                {% elif linha.acao in ["Aguardar", "Reduzir / nao aumentar"] %}
-                <span class="badge badge-wait">{{ fii_action_label(linha.acao) }}</span>
-                {% else %}
-                <span class="badge badge-neutral">{{ fii_action_label(linha.acao) }}</span>
-                {% endif %}
-              </td>
-              <td class="num">{{ linha.rank }}</td>
-              <td>{{ linha.ticker }}</td>
-              <td>{{ linha.vies }}</td>
-              <td>{% if linha.em_carteira %}Sim{% else %}Não{% endif %}</td>
-              <td class="num">{{ linha.valor_atual|brl }}</td>
-              <td>{{ linha.motivo }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-        {% else %}
-        <p class="note">Nenhum arquivo de carteira recomendada de ações encontrado para este mês.</p>
-        {% endif %}
-      </article>
-    </section>
-
-    <section class="section" aria-label="Ativos novos sem classificação">
-      <article class="card">
-        <h2>Ativos novos sem classificação</h2>
-        {% if ativos_nao_mapeados %}
-        <p class="note">Classifique estes ativos na interface para atualizar os objetivos no próximo relatório.</p>
-        <div class="table-wrap">
-          <table>
-            <tr>
-              <th>Ativo</th>
-              <th>Classe</th>
-              <th class="num">Valor M0</th>
-            </tr>
-            {% for a in ativos_nao_mapeados %}
-            <tr>
-              <td>{{ a.ativo }}</td>
-              <td>{{ a.classe_macro }}</td>
-              <td class="num">{{ a.valor_ativo|brl }}</td>
-            </tr>
-            {% endfor %}
-          </table>
-        </div>
-        {% else %}
-        <p class="note">Nenhum ativo novo sem classificação neste mês.</p>
-        {% endif %}
-      </article>
-    </section>
-
-    <section class="section" aria-label="Dividendos, proventos e custos">
-      <article class="card">
-        <h2>Dividendos, proventos e custos do extrato</h2>
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="summary-label">Ganhos brutos</div>
-            <div class="summary-value positive">{{ fluxos_extrato.total_ganhos|brl }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Taxas e impostos</div>
-            <div class="summary-value negative">{{ fluxos_extrato.total_perdas|brl }}</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-label">Líquido</div>
-            <div class="summary-value">{{ fluxos_extrato.liquido|brl }}</div>
-          </div>
-        </div>
-
-        {% if historico_fluxos.por_mes %}
-        <div class="cashflow-chart">
-          {% for linha in historico_fluxos.por_mes %}
-          <div class="cashflow-row">
-            <div class="cashflow-date">{{ linha.mes }}</div>
-            <div class="cashflow-bars">
-              <div class="cashflow-negative">
-                {% set loss_width = ((linha.perdas|abs) / historico_fluxos.max_abs_mensal * 100) %}
-                {% if linha.perdas < 0 %}
-                <span class="bar-loss" style="width: {{ loss_width }}%;"></span>
-                {% endif %}
-              </div>
-              <div class="cashflow-positive">
-                {% set gain_width = (linha.ganhos / historico_fluxos.max_abs_mensal * 100) %}
-                {% if linha.ganhos > 0 %}
-                <span class="bar-gain" style="width: {{ gain_width }}%;"></span>
-                {% endif %}
-              </div>
-            </div>
-            <div class="cashflow-net">{{ linha.liquido|brl }}</div>
-          </div>
+        <div class="insight-grid">
+          {% for insight in view.insights %}
+          <article class="callout {{ insight.tone }}">
+            <div class="insight-label">{{ insight.label }}</div>
+            <div class="insight-title">{{ insight.title }}</div>
+            <div class="insight-detail">{{ insight.detail }}</div>
+          </article>
           {% endfor %}
-          <div class="legend">
-            <span class="legend-gain">Ganhos</span>
-            <span class="legend-loss">Taxas/impostos</span>
-          </div>
         </div>
+      </section>
 
-        <p class="dt-filter-note">Histórico mensal agregado a partir dos extratos disponíveis até {{ mes }}. A tabela abaixo detalha apenas os eventos do mês do relatório.</p>
-        <div class="table-wrap">
-          <table id="tabela-fluxos" class="display compact stripe" style="width:100%">
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th>Tipo</th>
-                <th>Ativo</th>
-                <th>Descrição</th>
-                <th class="num">Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-            {% for evento in fluxos_extrato.eventos %}
-              <tr>
-                <td>{{ evento.data }}</td>
-                <td>{{ evento.tipo }}</td>
-                <td>{{ evento.ativo }}</td>
-                <td>{{ evento.descricao }}</td>
-                <td class="num" data-order="{{ evento.valor }}">{{ evento.valor|brl }}</td>
-              </tr>
+      <section class="section" id="plano" aria-label="Plano de ação">
+        <div class="section-header">
+          <h2>Plano de ação</h2>
+          <div class="section-kicker">Decisões sugeridas para o próximo aporte.</div>
+        </div>
+        <div class="decision-grid">
+          <article class="callout accent">
+            <h3>Sugestão de investimento para o mês</h3>
+            {% if view.action_plan %}
+            <div class="action-list">
+              {% for s in view.action_plan %}
+              <div class="action-item">
+                <div>
+                  <div class="action-title">{{ s.descricao }}</div>
+                  <div class="action-meta">Prioridade {{ s.prioridade }} · impacto estimado de {{ s.impacto_gap_pct|pct }} no gap</div>
+                </div>
+                <div class="action-value">{{ s.aporte_sugerido|brl }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="note">Nenhum aporte sugerido para este mês.</p>
+            {% endif %}
+          </article>
+
+          <article class="callout accent">
+            <h3>Movimentos planejados</h3>
+            {% if movimentos_planejados %}
+            <div class="planned-moves">{{ movimentos_planejados }}</div>
+            {% else %}
+            <p class="note">Nenhum movimento planejado registrado para este mês.</p>
+            {% endif %}
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="objetivos" aria-label="Objetivos">
+        <div class="section-header">
+          <h2>Objetivos</h2>
+          <div class="section-kicker">Acompanhamento por mapeamento de ativos.</div>
+        </div>
+        <article class="panel">
+          {% if view.goal_cards %}
+          <div class="goal-list">
+            {% for g in view.goal_cards %}
+            <div class="goal-card">
+              <div>
+                <div class="action-title">{{ g.descricao }}</div>
+                <div class="action-meta">{{ g.status }} · prioridade {{ g.prioridade }}</div>
+                <div class="progress-track" aria-label="Progresso de {{ g.descricao }}">
+                  <div class="progress-fill" style="width: {{ g.progresso_visual }}%;"></div>
+                </div>
+              </div>
+              <div class="goal-stats">
+                <span>{{ g.valor_atual_estimado|brl }} de {{ g.valor_alvo|brl }}</span>
+                <span>{{ g.progresso_pct|pct }} concluído</span>
+                <span>Gap: {{ g.gap|brl }}</span>
+                {% if g.aporte_sugerido > 0 %}
+                <span>Aporte: {{ g.aporte_sugerido|brl }}{% if g.meses_estimados %} · {{ g.meses_estimados }} meses{% endif %}</span>
+                {% endif %}
+              </div>
+            </div>
             {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <p class="note">Nenhum dividendo, provento, taxa ou imposto identificado no extrato deste mês.</p>
-        {% endif %}
-      </article>
-    </section>
+          </div>
+          {% else %}
+          <p class="note">Nenhum objetivo cadastrado.</p>
+          {% endif %}
+        </article>
+      </section>
 
-    <section class="section" aria-label="Variação dos ativos">
-      <article class="card">
-        <h2>Variação dos ativos MoM</h2>
-        <p class="note">Variação total: <strong class="{{ 'positive' if mom.variacao_total > 0 else 'negative' if mom.variacao_total < 0 else 'neutral' }}">{{ mom.variacao_total|brl }} ({{ mom.variacao_percentual|pct }})</strong>.</p>
-        <div class="table-wrap">
-          <table id="tabela-mom" class="display compact stripe" style="width:100%">
-            <thead>
+      <section class="section" id="diagnostico" aria-label="Alocação e variação">
+        <div class="section-header">
+          <h2>Diagnóstico da carteira</h2>
+          <div class="section-kicker">Alocação atual e variação por classe.</div>
+        </div>
+        <div class="analytics-grid">
+          <article class="panel">
+            <h3>Alocação por classe</h3>
+            <div class="bar-list">
+              {% for row in view.allocation_chart %}
+              <div class="bar-row">
+                <div class="bar-label">{{ row.classe }}</div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: {{ row.width }}%;"></div>
+                </div>
+                <div class="bar-value">{{ row.percentual|pct }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </article>
+
+          <article class="panel">
+            <h3>Variação mensal por classe</h3>
+            <div class="bar-list">
+              {% for row in view.variation_chart %}
+              <div class="bar-row">
+                <div class="bar-label">{{ row.classe }}</div>
+                <div class="bar-track">
+                  <div class="bar-fill {{ row.tone }}" style="width: {{ row.width }}%;"></div>
+                </div>
+                <div class="bar-value {{ row.tone }}">{{ row.valor|brl }} · {{ row.delta_label }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="posicao" aria-label="Posição atual">
+        <article class="card">
+          <h2>Posição atual</h2>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Patrimônio investido</div>
+              <div class="summary-value">{{ posicao.investido|brl }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Caixa disponível</div>
+              <div class="summary-value">{{ posicao.caixa|brl }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Patrimônio total</div>
+              <div class="summary-value">{{ posicao.total|brl }}</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
               <tr>
-                <th>Ativo</th>
                 <th>Classe</th>
-                <th>Objetivo</th>
+                <th>Subclasse</th>
                 <th class="num">M0</th>
                 <th class="num">M1</th>
                 <th class="num">Variação</th>
                 <th class="num">Variação %</th>
+                <th class="num">Representatividade</th>
               </tr>
-            </thead>
-            <tbody>
-            {% for linha in mom_linhas %}
+              {% for linha in posicao.alocacao_tabela %}
               <tr>
-                <td>{{ linha.ativo }}</td>
                 <td>{{ linha.classe }}</td>
-                <td>{{ linha.objetivo }}</td>
-                <td class="num" data-order="{{ linha.m0 }}">{{ linha.m0|brl }}</td>
-                <td class="num" data-order="{{ linha.m1 }}">{{ linha.m1|brl }}</td>
-                <td class="num {{ 'positive' if linha.variacao > 0 else 'negative' if linha.variacao < 0 else 'neutral' }}" data-order="{{ linha.variacao }}">{{ linha.variacao|brl }}</td>
-                <td class="num {{ 'positive' if linha.variacao_pct > 0 else 'negative' if linha.variacao_pct < 0 else 'neutral' }}" data-order="{{ linha.variacao_pct }}">{{ linha.variacao_pct|pct }}</td>
-              </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </article>
-    </section>
-
-    <section class="section" aria-label="Rentabilidade e macro">
-      <div class="analytics-grid">
-        <article class="card">
-          <h2>Rentabilidade da carteira</h2>
-          <div class="summary-grid">
-            <div class="summary-item">
-              <div class="summary-label">Resultado do mês</div>
-              <div class="summary-value {{ 'positive' if rentabilidade.resultado_mes > 0 else 'negative' if rentabilidade.resultado_mes < 0 else 'neutral' }}">{{ rentabilidade.resultado_mes|brl }}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Rentabilidade estimada</div>
-              <div class="summary-value {{ 'positive' if rentabilidade.rentabilidade_pct > 0 else 'negative' if rentabilidade.rentabilidade_pct < 0 else 'neutral' }}">{{ rentabilidade.rentabilidade_pct|pct }}</div>
-            </div>
-          </div>
-        </article>
-
-        <article class="card">
-          <h2>Análise macroeconômica</h2>
-          <div class="table-wrap">
-            <table>
-              <tr>
-                <th>Indicador</th>
-                <th>Valor</th>
-                <th>Comentário</th>
-              </tr>
-              {% for m in macro %}
-              <tr>
-                <td>{{ m.indicador }}</td>
-                <td>{{ m.valor }}</td>
-                <td>{{ m.comentario }}</td>
+                <td>{{ linha.subclasse }}</td>
+                <td class="num">{{ linha.m0|brl }}</td>
+                <td class="num">{{ linha.m1|brl }}</td>
+                <td class="num {{ 'positive' if linha.variacao > 0 else 'negative' if linha.variacao < 0 else 'neutral' }}">{{ linha.variacao|brl }}</td>
+                <td class="num {{ 'positive' if linha.variacao_pct > 0 else 'negative' if linha.variacao_pct < 0 else 'neutral' }}">{{ linha.variacao_pct|pct }}</td>
+                <td class="num">{{ linha.representatividade_pct|pct }}</td>
               </tr>
               {% endfor %}
             </table>
           </div>
         </article>
-      </div>
-    </section>
-  </main>
+      </section>
+
+      <section class="section" id="movimentos" aria-label="Compras e vendas">
+        <article class="card">
+          <h2>Compras e vendas identificadas</h2>
+          {% if compras_vendas.total_movimentos %}
+          <p class="note">Resumo calculado pela variação entre M1 e M0. Ativos sem quantidade informada aparecem como aumento ou redução por valor.</p>
+          <div class="movement-grid">
+            <div class="movement-panel">
+              <h3 class="positive">Compras / aumentos</h3>
+              <p><strong>{{ compras_vendas.compras.quantidade }}</strong> movimento(s), total estimado de <strong>{{ compras_vendas.compras.valor_total|brl }}</strong>.</p>
+              {% if compras_vendas.compras.principais %}
+              <ul class="movement-list">
+                {% for linha in compras_vendas.compras.principais %}
+                <li>
+                  <div>
+                    <div class="movement-name">{{ linha.ativo }}</div>
+                    <div class="movement-detail">{{ linha.tipo }}{% if linha.delta_quantidade %} · qtd {{ linha.delta_quantidade }}{% endif %}</div>
+                  </div>
+                  <div class="movement-value positive">{{ linha.delta_valor|brl }}</div>
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+            <div class="movement-panel">
+              <h3 class="negative">Vendas / reduções</h3>
+              <p><strong>{{ compras_vendas.vendas.quantidade }}</strong> movimento(s), total estimado de <strong>{{ compras_vendas.vendas.valor_total|brl }}</strong>.</p>
+              {% if compras_vendas.vendas.principais %}
+              <ul class="movement-list">
+                {% for linha in compras_vendas.vendas.principais %}
+                <li>
+                  <div>
+                    <div class="movement-name">{{ linha.ativo }}</div>
+                    <div class="movement-detail">{{ linha.tipo }}{% if linha.delta_quantidade %} · qtd {{ linha.delta_quantidade|abs }}{% endif %}</div>
+                  </div>
+                  <div class="movement-value negative">{{ linha.delta_valor|brl }}</div>
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+          </div>
+          {% else %}
+          <p class="note">Nenhuma compra ou venda identificada pela comparação de posições.</p>
+          {% endif %}
+        </article>
+      </section>
+
+      <section class="section" id="fiis" aria-label="Carteira recomendada de FIIs">
+        <article class="card">
+          <h2>Carteira recomendada de FIIs</h2>
+          {% if recomendacoes_fii.disponivel %}
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Comprar</div>
+              <div class="summary-value positive">{{ recomendacoes_fii.resumo.comprar }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Aumentar</div>
+              <div class="summary-value positive">{{ recomendacoes_fii.resumo.aumentar }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Reduzir / aguardar</div>
+              <div class="summary-value">{{ recomendacoes_fii.resumo.reduzir }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Encerrar</div>
+              <div class="summary-value negative">{{ recomendacoes_fii.resumo.encerrar }}</div>
+            </div>
+          </div>
+          {{ recommendation_toggle_list(view.recomendacoes_fii_groups) }}
+          {% else %}
+          <p class="note">Nenhum arquivo de carteira recomendada de FIIs encontrado para este mês.</p>
+          {% endif %}
+        </article>
+      </section>
+
+      <section class="section" id="acoes" aria-label="Carteira recomendada de Ações (Dividendos)">
+        <article class="card">
+          <h2>Carteira recomendada de Ações (Dividendos)</h2>
+          {% if recomendacoes_acoes.disponivel %}
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Comprar</div>
+              <div class="summary-value positive">{{ recomendacoes_acoes.resumo.comprar }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Aumentar</div>
+              <div class="summary-value positive">{{ recomendacoes_acoes.resumo.aumentar }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Reduzir / aguardar</div>
+              <div class="summary-value">{{ recomendacoes_acoes.resumo.reduzir }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Encerrar</div>
+              <div class="summary-value negative">{{ recomendacoes_acoes.resumo.encerrar }}</div>
+            </div>
+          </div>
+          {{ recommendation_toggle_list(view.recomendacoes_acoes_groups) }}
+          {% else %}
+          <p class="note">Nenhum arquivo de carteira recomendada de ações encontrado para este mês.</p>
+          {% endif %}
+        </article>
+      </section>
+
+      <section class="section" id="novos" aria-label="Ativos novos sem classificação">
+        <article class="card">
+          <h2>Ativos novos sem classificação</h2>
+          {% if ativos_nao_mapeados %}
+          <p class="note">Classifique estes ativos na interface para atualizar os objetivos no próximo relatório.</p>
+          <div class="table-wrap">
+            <table>
+              <tr>
+                <th>Ativo</th>
+                <th>Classe</th>
+                <th class="num">Valor M0</th>
+              </tr>
+              {% for a in ativos_nao_mapeados %}
+              <tr>
+                <td>{{ a.ativo }}</td>
+                <td>{{ a.classe_macro }}</td>
+                <td class="num">{{ a.valor_ativo|brl }}</td>
+              </tr>
+              {% endfor %}
+            </table>
+          </div>
+          {% else %}
+          <p class="note">Nenhum ativo novo sem classificação neste mês.</p>
+          {% endif %}
+        </article>
+      </section>
+
+      <section class="section" id="fluxos" aria-label="Dividendos, proventos e custos">
+        <article class="card">
+          <h2>Dividendos, proventos e custos do extrato</h2>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Ganhos brutos</div>
+              <div class="summary-value positive">{{ fluxos_extrato.total_ganhos|brl }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Taxas e impostos</div>
+              <div class="summary-value negative">{{ fluxos_extrato.total_perdas|brl }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Líquido</div>
+              <div class="summary-value">{{ fluxos_extrato.liquido|brl }}</div>
+            </div>
+          </div>
+
+          {% if historico_fluxos.por_mes %}
+          <div class="cashflow-chart">
+            {% for linha in historico_fluxos.por_mes %}
+            <div class="cashflow-row">
+              <div class="cashflow-date">{{ linha.mes }}</div>
+              <div class="cashflow-bars">
+                <div class="cashflow-negative">
+                  {% set loss_width = ((linha.perdas|abs) / historico_fluxos.max_abs_mensal * 100) %}
+                  {% if linha.perdas < 0 %}
+                  <span class="bar-loss" style="width: {{ loss_width }}%;"></span>
+                  {% endif %}
+                </div>
+                <div class="cashflow-positive">
+                  {% set gain_width = (linha.ganhos / historico_fluxos.max_abs_mensal * 100) %}
+                  {% if linha.ganhos > 0 %}
+                  <span class="bar-gain" style="width: {{ gain_width }}%;"></span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="cashflow-net">{{ linha.liquido|brl }}</div>
+            </div>
+            {% endfor %}
+            <div class="legend">
+              <span class="legend-gain">Ganhos</span>
+              <span class="legend-loss">Taxas/impostos</span>
+            </div>
+          </div>
+
+          <p class="dt-filter-note">Histórico mensal agregado a partir dos extratos disponíveis até {{ mes }}. A tabela abaixo detalha apenas os eventos do mês do relatório.</p>
+          <div class="table-wrap">
+            <table id="tabela-fluxos" class="display compact stripe" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Tipo</th>
+                  <th>Ativo</th>
+                  <th>Descrição</th>
+                  <th class="num">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for evento in fluxos_extrato.eventos %}
+                <tr>
+                  <td>{{ evento.data }}</td>
+                  <td>{{ evento.tipo }}</td>
+                  <td>{{ evento.ativo }}</td>
+                  <td>{{ evento.descricao }}</td>
+                  <td class="num" data-order="{{ evento.valor }}">{{ evento.valor|brl }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="note">Nenhum dividendo, provento, taxa ou imposto identificado no extrato deste mês.</p>
+          {% endif %}
+        </article>
+      </section>
+
+      <section class="section" id="mom" aria-label="Variação dos ativos">
+        <article class="card">
+          <h2>Variação dos ativos MoM</h2>
+          <p class="note">Variação total: <strong class="{{ 'positive' if mom.variacao_total > 0 else 'negative' if mom.variacao_total < 0 else 'neutral' }}">{{ mom.variacao_total|brl }} ({{ mom.variacao_percentual|pct }})</strong>.</p>
+          <div class="table-wrap">
+            <table id="tabela-mom" class="display compact stripe" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Ativo</th>
+                  <th>Classe</th>
+                  <th>Objetivo</th>
+                  <th class="num">M0</th>
+                  <th class="num">M1</th>
+                  <th class="num">Variação</th>
+                  <th class="num">Variação %</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for linha in mom_linhas %}
+                <tr>
+                  <td>{{ linha.ativo }}</td>
+                  <td>{{ linha.classe }}</td>
+                  <td>{{ linha.objetivo }}</td>
+                  <td class="num" data-order="{{ linha.m0 }}">{{ linha.m0|brl }}</td>
+                  <td class="num" data-order="{{ linha.m1 }}">{{ linha.m1|brl }}</td>
+                  <td class="num {{ 'positive' if linha.variacao > 0 else 'negative' if linha.variacao < 0 else 'neutral' }}" data-order="{{ linha.variacao }}">{{ linha.variacao|brl }}</td>
+                  <td class="num {{ 'positive' if linha.variacao_pct > 0 else 'negative' if linha.variacao_pct < 0 else 'neutral' }}" data-order="{{ linha.variacao_pct }}">{{ linha.variacao_pct|pct }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="section" id="macro" aria-label="Rentabilidade e macro">
+        <div class="analytics-grid">
+          <article class="card">
+            <h2>Rentabilidade da carteira</h2>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Resultado do mês</div>
+                <div class="summary-value {{ 'positive' if rentabilidade.resultado_mes > 0 else 'negative' if rentabilidade.resultado_mes < 0 else 'neutral' }}">{{ rentabilidade.resultado_mes|brl }}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Rentabilidade estimada</div>
+                <div class="summary-value {{ 'positive' if rentabilidade.rentabilidade_pct > 0 else 'negative' if rentabilidade.rentabilidade_pct < 0 else 'neutral' }}">{{ rentabilidade.rentabilidade_pct|pct }}</div>
+              </div>
+            </div>
+          </article>
+
+          <article class="card">
+            <h2>Análise macroeconômica</h2>
+            <div class="table-wrap">
+              <table>
+                <tr>
+                  <th>Indicador</th>
+                  <th>Valor</th>
+                  <th>Comentário</th>
+                </tr>
+                {% for m in macro %}
+                <tr>
+                  <td>{{ m.indicador }}</td>
+                  <td>{{ m.valor }}</td>
+                  <td>{{ m.comentario }}</td>
+                </tr>
+                {% endfor %}
+              </table>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
@@ -607,6 +620,50 @@
         language: {
           url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
         }
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      var toggle = document.querySelector('.mobile-nav-toggle');
+      var mobileList = document.getElementById('mobile-nav-list');
+      if (toggle && mobileList) {
+        toggle.addEventListener('click', function () {
+          var isOpen = mobileList.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        mobileList.querySelectorAll('a').forEach(function (link) {
+          link.addEventListener('click', function () {
+            mobileList.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+          });
+        });
+      }
+
+      var navLinks = document.querySelectorAll('.sidebar-nav a, .mobile-nav-list a');
+      var sections = Array.prototype.map.call(navLinks, function (link) {
+        var id = link.getAttribute('data-section');
+        return document.getElementById(id);
+      }).filter(Boolean);
+
+      if (!sections.length || typeof IntersectionObserver === 'undefined') return;
+
+      function setActive(id) {
+        navLinks.forEach(function (link) {
+          link.classList.toggle('active', link.getAttribute('data-section') === id);
+        });
+      }
+
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            setActive(entry.target.id);
+          }
+        });
+      }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+
+      sections.forEach(function (section) {
+        observer.observe(section);
       });
     })();
   </script>

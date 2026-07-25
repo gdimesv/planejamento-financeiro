@@ -106,6 +106,59 @@ def _build_action_plan(sugestoes: list[dict], objetivos: list[dict]) -> list[dic
     return actions
 
 
+_ACAO_ORDER = [
+    "Comprar",
+    "Aumentar posicao",
+    "Reduzir / nao aumentar",
+    "Aguardar",
+    "Encerrar posicao",
+    "Manter",
+    "Monitorar",
+    "Fora da carteira recomendada",
+]
+
+_ACAO_DEFAULT_OPEN = {"Comprar"}
+
+
+def _build_recommendation_groups(rec: dict) -> list[dict]:
+    """Agrupa as linhas de recomendacao (FII/Acoes) por acao sugerida.
+
+    O motivo e determinado inteiramente pela acao (mesma acao => mesmo motivo,
+    ver build_fii_recommendation_actions/build_stock_recommendation_actions),
+    entao o primeiro motivo do grupo serve como legenda unica do toggle.
+    """
+    rows = list(rec.get("acoes", []))
+    if not rows:
+        return []
+
+    by_acao: dict[str, list[dict]] = {}
+    for row in rows:
+        by_acao.setdefault(str(row.get("acao", "-")), []).append(row)
+
+    ordered_keys = [k for k in _ACAO_ORDER if k in by_acao]
+    ordered_keys += [k for k in by_acao if k not in _ACAO_ORDER]
+
+    groups = []
+    for acao in ordered_keys:
+        group_rows = by_acao[acao]
+        motivo_comum = str(group_rows[0].get("motivo", ""))
+        rows_out = []
+        for row in group_rows:
+            motivo_row = str(row.get("motivo", ""))
+            rows_out.append({**row, "motivo_diferente": motivo_row if motivo_row != motivo_comum else ""})
+        groups.append(
+            {
+                "acao": acao,
+                "count": len(group_rows),
+                "valor_total": sum(_num(r.get("valor_atual")) for r in group_rows),
+                "motivo_comum": motivo_comum,
+                "rows": rows_out,
+                "default_open": acao in _ACAO_DEFAULT_OPEN,
+            }
+        )
+    return groups
+
+
 def _build_insights(payload: dict, allocation_chart: list[dict], action_plan: list[dict]) -> list[dict]:
     mom = payload.get("mom", {})
     rent = payload.get("rentabilidade", {})
@@ -247,4 +300,6 @@ def build_report_view_model(payload: dict) -> dict:
         "variation_chart": variation_chart,
         "goal_cards": goal_cards,
         "action_plan": action_plan,
+        "recomendacoes_fii_groups": _build_recommendation_groups(payload.get("recomendacoes_fii", {})),
+        "recomendacoes_acoes_groups": _build_recommendation_groups(payload.get("recomendacoes_acoes", {})),
     }
