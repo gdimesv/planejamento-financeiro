@@ -1,0 +1,14 @@
+<div class="job-banner {{ job.status }}"
+  {% if job.status == "running" %}
+  hx-get="/setup/{{ cliente }}/{{ mes }}/job/{{ job.id }}"
+  hx-trigger="every 2s"
+  hx-swap="outerHTML"
+  {% endif %}>
+  {% if job.status == "running" %}
+    Coletando {{ label }}&hellip; se abrir uma janela do navegador pedindo login, faça o login lá. Isso pode levar alguns minutos.
+  {% elif job.status == "done" %}
+    Coleta de {{ label }} concluída.
+  {% else %}
+    Falha ao coletar {{ label }} (código {{ job.returncode }}). Confira o log no terminal onde o servidor está rodando.
+  {% endif %}
+</div>

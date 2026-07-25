@@ -1,0 +1,8 @@
+{% if ok %}
+<p>Relatório gerado com sucesso. <a href="/report/{{ cliente }}/{{ mes }}" target="_blank" rel="noopener">Abrir relatório</a></p>
+{% else %}
+<p>Não foi possível gerar o relatório:</p>
+<ul class="reasons">
+  {% for reason in reasons %}<li>{{ reason }}</li>{% endfor %}
+</ul>
+{% endif %}

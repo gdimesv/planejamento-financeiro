@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setup {{ mes }} - {{ cliente }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+  <div class="page">
+    <p class="eyebrow"><a href="/">Planejamento Financeiro</a> &middot; {{ cliente }}</p>
+    <h1>Setup do mês {{ mes }}</h1>
+    <p class="hint">
+      Atualize os dados nesta ordem: coleta da XP, coleta da Suno e, por fim, a posição
+      internacional manual. O relatório só é liberado quando os dados obrigatórios estiverem prontos.
+    </p>
+
+    <div id="job-banner"></div>
+
+    {% include "_panel.html" %}
+  </div>
+</body>
+</html>

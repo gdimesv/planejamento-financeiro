@@ -1,0 +1,104 @@
+{% macro badge(status) -%}
+  {% if status == "ok" %}<span class="badge ok">OK</span>
+  {% elif status == "warn" %}<span class="badge warn">Atenção</span>
+  {% else %}<span class="badge pending">Pendente</span>
+  {% endif %}
+{%- endmacro %}
+
+<div id="pipeline-panel" {% if oob %}hx-swap-oob="true"{% endif %}>
+
+  <div class="card">
+    <h2>1. Coleta automática</h2>
+    <p class="hint">Abre o navegador para login manual; a etapa fica pronta quando o arquivo aparece.</p>
+    {% for group in groups %}
+    <div class="step-row">
+      <div>{{ badge(group.status) }}</div>
+      <div>
+        <div class="step-label">{{ group.label }}</div>
+        <div class="step-detail">
+          {% if group.files %}{{ group.files | join(", ") }}{% else %}{{ group.detail }}{% endif %}
+        </div>
+      </div>
+      <div>
+        <button
+          class="{{ 'secondary' if group.status == 'ok' else '' }}"
+          hx-post="/setup/{{ cliente }}/{{ mes }}/collect/{{ group.kind }}"
+          hx-target="#job-banner"
+          hx-swap="innerHTML">
+          {{ 'Recoletar' if group.status == 'ok' else 'Coletar' }}
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <h2>2. Posição internacional (manual)</h2>
+    <p class="hint">
+      Uma linha por ativo: <code>Classe,Ativo,Valor</code>. Exemplo:
+      <code>Ações no Exterior,Apple,19962</code>. Salvar substitui o mês inteiro.
+    </p>
+    <div class="step-row">
+      <div>{{ badge(internacional.status.value) }}</div>
+      <div>
+        <div class="step-label">Posição internacional</div>
+        <div class="step-detail">
+          {% if internacional.files %}{{ internacional.files | join(", ") }}{% else %}{{ internacional.detail }}{% endif %}
+        </div>
+      </div>
+      <div></div>
+    </div>
+    <form
+      hx-post="/setup/{{ cliente }}/{{ mes }}/internacional"
+      hx-target="#pipeline-panel"
+      hx-swap="outerHTML">
+      <textarea name="texto" placeholder="Ações no Exterior,Apple,19962">{{ internacional_text }}</textarea>
+      <div style="margin-top:10px;">
+        <button type="submit">Salvar posição internacional</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>3. Diagnóstico</h2>
+    {% for step in diag_steps %}
+    <div class="step-row">
+      <div>{{ badge(step.status.value) }}</div>
+      <div>
+        <div class="step-label">{{ step.label }}</div>
+        <div class="step-detail">{{ step.detail }}</div>
+      </div>
+      <div></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <h2>4. Relatório</h2>
+    {% if gate.ready %}
+    <p class="hint">Dados obrigatórios prontos. Ajuste o aporte simulado e gere o relatório.</p>
+    {% else %}
+    <p class="hint">Relatório bloqueado até as etapas obrigatórias estarem prontas:</p>
+    <ul class="reasons">
+      {% for reason in gate.blocking %}<li>{{ reason }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% if gate.warnings %}
+    <ul class="reasons">
+      {% for warning in gate.warnings %}<li>{{ warning }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    <form
+      class="report-cta"
+      hx-post="/setup/{{ cliente }}/{{ mes }}/generate-report"
+      hx-target="#report-result"
+      hx-swap="innerHTML">
+      <label for="aporte">Aporte mensal (R$)</label>
+      <input type="number" step="100" name="aporte" id="aporte" value="{{ aporte_default }}">
+      <button type="submit" {% if not gate.ready %}disabled{% endif %}>Gerar relatório</button>
+    </form>
+    <div id="report-result" style="margin-top:12px;"></div>
+  </div>
+
+</div>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planejamento Financeiro</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="page">
+    <p class="eyebrow">Planejamento Financeiro</p>
+    <h1>Clientes</h1>
+
+    {% for cliente in clientes %}
+    <div class="card">
+      <h2>{{ cliente.id }}</h2>
+      <ul class="month-list">
+        {% for mes in cliente.meses %}
+        <li>
+          <a href="/setup/{{ cliente.id }}/{{ mes }}">Setup {{ mes }}</a>
+          &middot;
+          <a href="/report/{{ cliente.id }}/{{ mes }}" target="_blank" rel="noopener">relatório</a>
+        </li>
+        {% else %}
+        <li>Nenhum mês ainda.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <p>Nenhum cliente encontrado em <code>clientes/</code>.</p>
+    {% endfor %}
+  </div>
+</body>
+</html>
