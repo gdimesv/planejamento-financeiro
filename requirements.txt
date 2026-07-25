@@ -3,3 +3,6 @@ openpyxl
 pyyaml
 jinja2
 streamlit
+fastapi
+uvicorn[standard]
+python-multipart
