@@ -47,7 +47,7 @@ def normalize_position(df: pd.DataFrame, cliente_id: str) -> pd.DataFrame:
             if isinstance(value, (int, float)):
                 return float(value)
             text = str(value).strip().replace("R$", "").replace("%", "")
-            text = text.replace(" ", "")
+            text = text.replace(" ", "").replace('"', "")
             if "," in text:
                 # Formato brasileiro com decimal em virgula.
                 text = text.replace(".", "").replace(",", ".")
