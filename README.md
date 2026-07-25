@@ -72,6 +72,20 @@ Uso mensal:
 
 Abre um Chromium; faca login na Suno se pedido e deixe a pagina `carteiras/dividendos` aberta. O CSV e salvo automaticamente em `clientes/<cliente>/inputs/<mes>/acoes_recomendadas_<mes>.csv`. O relatorio compara esse arquivo com a posicao atual de Ações e gera a aba "Carteira recomendada de Ações (Dividendos)" com as mesmas sugestoes (comprar, aumentar, reduzir/nao aumentar, aguardar ou encerrar) usadas para FIIs.
 
+## Posicao e extrato da XP
+
+O script em `scripts/xp/` automatiza a coleta da posicao (carteira) e do extrato da conta XP (login manual, sessao salva em `scripts/xp/.xp-session/`).
+
+Requisitos (uma vez): `cd scripts/xp && npm install` (reaproveita o Chromium ja instalado pelo Playwright do `suno-fiis`; se ainda nao tiver nenhum, rode tambem `npx playwright install chromium`).
+
+Uso mensal:
+
+```bash
+./scripts/xp/run-xp.sh --cliente gabriel --mes 2026-07
+```
+
+Abre um Chromium; faca login na XP se pedido (usuario, senha e token). O script baixa o XLS da carteira em `posicao_m0_xp_<mes>.xlsx` e o extrato dos ultimos 3 meses (90 dias, para cobrir eventuais buracos de meses sem upload) em `extrato_xp_<mes>.xlsx`, ambos direto em `clientes/<cliente>/inputs/<mes>/`.
+
 ## Formato dos inputs
 
 Em **`clientes/<cliente>/inputs/<YYYY-MM>/`** voce guarda **so o mes de referencia** (recorrente):

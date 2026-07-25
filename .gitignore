@@ -14,4 +14,7 @@ clientes/
 node_modules/
 scripts/suno-fiis/.suno-session/
 scripts/suno-acoes/.suno-session/
+scripts/xp/.xp-session/
+
+.claude/
 
