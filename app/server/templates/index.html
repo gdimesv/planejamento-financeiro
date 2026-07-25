@@ -26,10 +26,21 @@
         <li>Nenhum mês ainda.</li>
         {% endfor %}
       </ul>
+      <div class="new-month">
+        <input type="month" id="new-month-{{ cliente.id }}" aria-label="Novo mês para {{ cliente.id }}">
+        <button type="button" onclick="irParaSetup('{{ cliente.id }}')">Iniciar setup do mês</button>
+      </div>
     </div>
     {% else %}
     <p>Nenhum cliente encontrado em <code>clientes/</code>.</p>
     {% endfor %}
   </div>
+  <script>
+    function irParaSetup(clienteId) {
+      var input = document.getElementById('new-month-' + clienteId);
+      if (!input.value) return;
+      window.location.href = '/setup/' + clienteId + '/' + input.value;
+    }
+  </script>
 </body>
 </html>
