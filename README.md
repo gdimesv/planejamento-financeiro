@@ -13,36 +13,30 @@ Aplicativo local em Python para gerar um relatorio mensal por cliente, com base 
 pip install -r requirements.txt
 ```
 
-3. Execute:
+3. Suba o app local:
 
 ```bash
-python app/main.py --cliente gabriel --mes 2026-03 --aporte-mensal 8000
+cd app && python3 -m uvicorn server.app:app --reload
 ```
 
-Saida esperada:
+Acesse `http://127.0.0.1:8000/`. La voce encontra, por cliente/mes:
 
-- `clientes/gabriel/outputs/2026-03/relatorio.html`
+- **Setup do mes**: dispara a coleta da XP e da Suno (abre um Chromium para login manual), acompanha o job em tempo real, preenche a posicao internacional manual, registra os movimentos planejados e ve o diagnostico (ativos novos sem objetivo, base de comparacao MoM).
+- **Objetivos**: cadastra/edita objetivos e o aporte mensal padrao do cliente.
+- **Classificacao de ativos**: mapeia ativos novos (ou todos) para um objetivo, com peso.
+- **Relatorio**: so fica liberado quando a posicao e o extrato da XP do mes estiverem prontos; gerar abre o relatorio em `clientes/<cliente>/outputs/<mes>/relatorio.html`.
 
-## Interface de onboarding (objetivos e classificacao)
-
-Para preencher de forma amigavel:
+Alternativamente, para gerar o relatorio direto via linha de comando (uso em lote/debug, sem passar pelo servidor):
 
 ```bash
-streamlit run app/ui.py
+python3 app/main.py --cliente gabriel --mes 2026-03 --aporte-mensal 8000
 ```
 
-Na interface voce consegue:
-
-- subir os arquivos do mes (extrato e posicoes m0; o MoM vem do mes anterior automaticamente)
-- cadastrar/editar objetivos por cliente
-- mapear ativos novos para objetivos (com peso)
-- gerar e visualizar o relatorio na propria tela
-- salvar configuracoes em arquivo para reutilizar mensalmente
-
-Arquivos gerados:
+Arquivos gerados pelo fluxo de setup:
 
 - `clientes/<cliente>/objetivos.yaml`
 - `clientes/<cliente>/config/asset_objective_map.csv`
+- `clientes/<cliente>/planos/<mes>/movimentos.md`
 
 ## Carteira recomendada de FIIs (Suno)
 
