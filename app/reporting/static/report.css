@@ -231,6 +231,28 @@ h3 {
   background: var(--accent-bg);
 }
 
+.callout textarea {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--surface);
+  resize: vertical;
+}
+
+.callout button {
+  font: inherit;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent);
+  color: white;
+}
+
 .insight-label {
   margin-bottom: 6px;
   color: var(--muted);
@@ -427,14 +449,6 @@ h3 {
   margin: 10px 0 0;
   padding: 0;
   list-style: none;
-}
-
-.planned-moves {
-  padding: 12px;
-  border-radius: 6px;
-  background: var(--surface-muted);
-  line-height: 1.55;
-  white-space: pre-wrap;
 }
 
 .table-wrap {

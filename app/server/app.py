@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 # Garante que os modulos do motor (core, ingest, main, pipeline) estejam no path,
@@ -9,22 +10,22 @@ APP_DIR = Path(__file__).resolve().parents[1]
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
-import csv
-
 import yaml
-from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from ingest.loader import _read_manual_international_position, month_previous
 from pipeline.gate import evaluate_gate
 from pipeline.goals import (
     load_asset_map,
     load_ativos_mes,
+    load_aporte_usado,
     load_objetivos,
-    load_planned_moves,
     save_asset_map,
+    save_aporte_usado,
     save_objetivos,
     save_planned_moves,
 )
@@ -142,6 +143,7 @@ def api_report(cliente: str, mes: str, body: ReportBody) -> dict:
         aporte = float(cfg.get("aporte_mensal_padrao", 0.0) or 0.0)
 
     out = run_report(cliente, mes, float(aporte))
+    save_aporte_usado(cliente, mes, float(aporte))
     return {"ok": True, "path": str(out), "url": f"/report/{cliente}/{mes}"}
 
 
@@ -151,6 +153,20 @@ def serve_report(cliente: str, mes: str) -> FileResponse:
     if not html_path.exists():
         raise HTTPException(404, "Relatorio ainda nao gerado para este mes.")
     return FileResponse(html_path, media_type="text/html")
+
+
+@app.post("/report/{cliente}/{mes}/movimentos")
+def report_movimentos(cliente: str, mes: str, movimentos: str = Form("")):
+    from main import run as run_report
+
+    save_planned_moves(cliente, mes, movimentos)
+    output_file = client_dir(cliente) / "outputs" / mes / "relatorio.html"
+    if output_file.exists():
+        aporte = load_aporte_usado(cliente, mes)
+        if aporte is None:
+            aporte = _aporte_default(cliente)
+        run_report(cliente, mes, aporte)
+    return RedirectResponse(f"/report/{cliente}/{mes}", status_code=303)
 
 
 # --- Helpers de listagem ---
@@ -199,36 +215,57 @@ def _collect_groups(state: MonthState) -> list[dict]:
     return groups
 
 
-def _parse_internacional_text(texto: str) -> list[dict]:
-    rows = []
-    for line in texto.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts = line.split(",", 2)
-        ativo = parts[1].strip() if len(parts) > 1 else ""
-        if not ativo:
-            continue
-        rows.append(
-            {
-                "classe": parts[0].strip(),
-                "ativo": ativo,
-                "valor": parts[2].strip() if len(parts) > 2 else "",
-            }
-        )
-    return rows
+def _find_internacional_file(month_dir: Path) -> Path | None:
+    if not month_dir.exists():
+        return None
+    for path in sorted(month_dir.glob("*")):
+        name = path.name.lower()
+        if path.is_file() and "m0" in name and any(
+            token in name for token in ("_int", "internacional", "exterior", "usa")
+        ):
+            return path
+    return None
 
 
-def _internacional_existing_text(cliente: str, mes: str) -> str:
-    path = month_input_dir(cliente, mes) / f"posicao_m0_xp_int_{mes}.csv"
-    if not path.exists():
-        return ""
-    with path.open("r", encoding="utf-8", newline="") as f:
-        reader = csv.DictReader(f)
-        return "\n".join(
-            f"{row.get('Classe', '')},{row.get('Ativo', '')},{row.get('Valor Atual (R$)', '')}"
-            for row in reader
-        )
+def _fmt_valor(valor: object) -> str:
+    texto = str(valor).strip().replace('"', "")
+    if "," in texto and "." not in texto:
+        texto = texto.replace(",", ".")
+    try:
+        num = float(texto)
+    except (TypeError, ValueError):
+        return str(valor).strip()
+    return str(int(num)) if num == int(num) else f"{num:.2f}"
+
+
+def _internacional_rows_from_month(cliente: str, mes: str) -> list[str]:
+    path = _find_internacional_file(month_input_dir(cliente, mes))
+    if path is None:
+        return []
+    df = _read_manual_international_position(path)
+    if df.empty:
+        return []
+    cols = {str(col).lower().strip(): col for col in df.columns}
+    classe_col, ativo_col, valor_col = cols.get("classe"), cols.get("ativo"), cols.get("valor atual (r$)")
+    if not (classe_col and ativo_col and valor_col):
+        return []
+    linhas = []
+    for _, row in df.iterrows():
+        ativo = str(row.get(ativo_col, "")).strip()
+        if not ativo or ativo.lower() == "nan":
+            continue
+        classe = str(row.get(classe_col, "")).strip()
+        linhas.append(f"{classe},{ativo},{_fmt_valor(row.get(valor_col, ''))}")
+    return linhas
+
+
+def _internacional_template_rows(cliente: str, mes: str) -> tuple[str, list[str]]:
+    """Linhas de referencia para o modelo de CSV: do mes atual, ou do mes anterior se ainda vazio."""
+    linhas = _internacional_rows_from_month(cliente, mes)
+    if linhas:
+        return mes, linhas
+    prev_mes = month_previous(mes)
+    return prev_mes, _internacional_rows_from_month(cliente, prev_mes)
 
 
 def _aporte_default(cliente: str) -> float:
@@ -242,16 +279,16 @@ def _aporte_default(cliente: str) -> float:
 def _panel_context(cliente: str, mes: str, oob: bool = False) -> dict:
     state = compute_month_state(cliente, mes)
     steps_by_id = {s.id: s for s in state.steps}
+    template_mes, template_linhas = _internacional_template_rows(cliente, mes)
     return {
         "cliente": cliente,
         "mes": mes,
         "groups": _collect_groups(state),
         "internacional": steps_by_id["internacional"],
-        "internacional_text": _internacional_existing_text(cliente, mes),
+        "internacional_template": {"mes": template_mes, "disponivel": bool(template_linhas)},
         "diag_steps": [steps_by_id["classificacao"], steps_by_id["mom"]],
         "gate": evaluate_gate(state),
         "aporte_default": _aporte_default(cliente),
-        "movimentos_text": load_planned_moves(cliente, mes),
         "oob": oob,
     }
 
@@ -383,11 +420,36 @@ def setup_job_status(cliente: str, mes: str, job_id: str) -> HTMLResponse:
     return HTMLResponse(banner + panel)
 
 
+@app.get("/setup/{cliente}/{mes}/internacional/modelo")
+def internacional_modelo(cliente: str, mes: str) -> Response:
+    _, linhas = _internacional_template_rows(cliente, mes)
+    csv_text = "\n".join(["Classe,Ativo,Valor Atual (R$)", *linhas]) + "\n"
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="posicao_internacional_{mes}.csv"'},
+    )
+
+
 @app.post("/setup/{cliente}/{mes}/internacional", response_class=HTMLResponse)
-def setup_internacional(request: Request, cliente: str, mes: str, texto: str = Form(...)):
-    save_internacional(cliente, mes, _parse_internacional_text(texto))
+async def setup_internacional(request: Request, cliente: str, mes: str, arquivo: UploadFile = File(...)):
+    conteudo = await arquivo.read()
+    erro = None
+    with tempfile.NamedTemporaryFile(suffix=".csv") as tmp:
+        tmp.write(conteudo)
+        tmp.flush()
+        df = _read_manual_international_position(Path(tmp.name))
+
+    if df.empty:
+        erro = "CSV invalido: confira se as colunas Classe, Ativo e Valor Atual (R$) estao presentes."
+    else:
+        dest = month_input_dir(cliente, mes) / f"posicao_m0_xp_int_{mes}.csv"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(conteudo)
+
     return templates.TemplateResponse(
-        "_panel.html", {"request": request, **_panel_context(cliente, mes)}
+        "_panel.html",
+        {"request": request, **_panel_context(cliente, mes), "internacional_error": erro},
     )
 
 
@@ -402,16 +464,9 @@ def setup_generate_report(request: Request, cliente: str, mes: str, aporte: floa
             "_report_result.html", {"request": request, "ok": False, "reasons": gate.blocking}
         )
     run_report(cliente, mes, aporte)
+    save_aporte_usado(cliente, mes, aporte)
     return templates.TemplateResponse(
         "_report_result.html", {"request": request, "ok": True, "cliente": cliente, "mes": mes}
-    )
-
-
-@app.post("/setup/{cliente}/{mes}/movimentos", response_class=HTMLResponse)
-def setup_movimentos(request: Request, cliente: str, mes: str, movimentos: str = Form("")):
-    save_planned_moves(cliente, mes, movimentos)
-    return templates.TemplateResponse(
-        "_panel.html", {"request": request, **_panel_context(cliente, mes)}
     )
 
 

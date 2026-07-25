@@ -35,9 +35,14 @@
   <div class="card">
     <h2>2. Posição internacional (manual)</h2>
     <p class="hint">
-      Uma linha por ativo: <code>Classe,Ativo,Valor</code>. Exemplo:
-      <code>Ações no Exterior,Apple,19962</code>. Salvar substitui o mês inteiro.
+      Suba um CSV com as colunas <code>Classe,Ativo,Valor Atual (R$)</code>. Enviar substitui o mês inteiro.
+      {% if internacional_template.disponivel %}
+      Se preferir partir dos valores de {{ internacional_template.mes }}, <a href="/setup/{{ cliente }}/{{ mes }}/internacional/modelo">baixe o modelo já preenchido</a>, atualize os valores e envie de volta.
+      {% endif %}
     </p>
+    {% if internacional_error %}
+    <ul class="reasons"><li>{{ internacional_error }}</li></ul>
+    {% endif %}
     <div class="step-row">
       <div>{{ badge(internacional.status.value) }}</div>
       <div>
@@ -51,10 +56,11 @@
     <form
       hx-post="/setup/{{ cliente }}/{{ mes }}/internacional"
       hx-target="#pipeline-panel"
-      hx-swap="outerHTML">
-      <textarea name="texto" placeholder="Ações no Exterior,Apple,19962">{{ internacional_text }}</textarea>
+      hx-swap="outerHTML"
+      hx-encoding="multipart/form-data">
+      <input type="file" name="arquivo" accept=".csv" required>
       <div style="margin-top:10px;">
-        <button type="submit">Salvar posição internacional</button>
+        <button type="submit">Enviar CSV</button>
       </div>
     </form>
   </div>
@@ -78,21 +84,7 @@
   </div>
 
   <div class="card">
-    <h2>4. Movimentos planejados</h2>
-    <p class="hint">Movimentos que você pretende fazer neste mês (aparecem no relatório).</p>
-    <form
-      hx-post="/setup/{{ cliente }}/{{ mes }}/movimentos"
-      hx-target="#pipeline-panel"
-      hx-swap="outerHTML">
-      <textarea name="movimentos" placeholder="Vender X ações de PETR4&#10;Comprar X ações de ITSA4">{{ movimentos_text }}</textarea>
-      <div style="margin-top:10px;">
-        <button type="submit">Salvar movimentos planejados</button>
-      </div>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>5. Relatório</h2>
+    <h2>4. Relatório</h2>
     {% if gate.ready %}
     <p class="hint">Dados obrigatórios prontos. Ajuste o aporte simulado e gere o relatório.</p>
     {% else %}

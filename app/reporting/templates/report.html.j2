@@ -178,11 +178,13 @@
 
           <article class="callout accent">
             <h3>Movimentos planejados</h3>
-            {% if movimentos_planejados %}
-            <div class="planned-moves">{{ movimentos_planejados }}</div>
-            {% else %}
-            <p class="note">Nenhum movimento planejado registrado para este mês.</p>
-            {% endif %}
+            <p class="note">Registre aqui os movimentos que pretende fazer após analisar este relatório.</p>
+            <form method="post" action="/report/{{ cliente_id }}/{{ mes }}/movimentos">
+              <textarea name="movimentos" rows="4" placeholder="Vender X ações de PETR4&#10;Comprar X ações de ITSA4">{{ movimentos_planejados }}</textarea>
+              <div style="margin-top:10px;">
+                <button type="submit">Salvar movimentos planejados</button>
+              </div>
+            </form>
           </article>
         </div>
       </section>

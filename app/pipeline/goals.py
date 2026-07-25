@@ -23,6 +23,10 @@ def planned_moves_file(cliente_id: str, mes: str) -> Path:
     return client_dir(cliente_id) / "planos" / mes / "movimentos.md"
 
 
+def aporte_usado_file(cliente_id: str, mes: str) -> Path:
+    return client_dir(cliente_id) / "planos" / mes / "aporte_usado.txt"
+
+
 def load_objetivos(cliente_id: str) -> dict:
     path = objetivos_file(cliente_id)
     default = {"cliente": {"id": cliente_id, "nome": cliente_id.title()}, "objetivos": []}
@@ -89,4 +93,21 @@ def save_planned_moves(cliente_id: str, mes: str, content: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     content = content.strip()
     path.write_text(content + ("\n" if content else ""), encoding="utf-8")
+    return path
+
+
+def load_aporte_usado(cliente_id: str, mes: str) -> float | None:
+    path = aporte_usado_file(cliente_id, mes)
+    if not path.exists():
+        return None
+    try:
+        return float(path.read_text(encoding="utf-8").strip())
+    except ValueError:
+        return None
+
+
+def save_aporte_usado(cliente_id: str, mes: str, aporte: float) -> Path:
+    path = aporte_usado_file(cliente_id, mes)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(aporte), encoding="utf-8")
     return path

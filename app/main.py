@@ -137,6 +137,7 @@ def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
     macro = load_macro_commentary(macro_file)
 
     payload = {
+        "cliente_id": cliente_id,
         "cliente_nome": config.get("cliente", {}).get("nome", cliente_id),
         "mes": mes,
         "posicao": pos,
