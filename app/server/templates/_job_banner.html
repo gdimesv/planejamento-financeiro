@@ -9,6 +9,9 @@
   {% elif job.status == "done" %}
     Coleta de {{ label }} concluída.
   {% else %}
-    Falha ao coletar {{ label }} (código {{ job.returncode }}). Confira o log no terminal onde o servidor está rodando.
+    Falha ao coletar {{ label }} (código {{ job.returncode }}).
+    {% if job.output %}
+    <pre class="job-output">{{ job.output }}</pre>
+    {% endif %}
   {% endif %}
 </div>

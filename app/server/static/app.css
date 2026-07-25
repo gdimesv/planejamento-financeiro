@@ -159,6 +159,19 @@ textarea {
 .job-banner.done { background: var(--ok-bg); color: var(--ok); }
 .job-banner.error { background: var(--warn-bg); color: var(--warn); }
 
+.job-output {
+  max-height: 220px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  color: inherit;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .reasons {
   margin: 8px 0 0;
   padding-left: 18px;
