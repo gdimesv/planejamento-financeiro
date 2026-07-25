@@ -68,13 +68,31 @@
         <div class="step-label">{{ step.label }}</div>
         <div class="step-detail">{{ step.detail }}</div>
       </div>
-      <div></div>
+      <div>
+        {% if step.id == "classificacao" %}
+        <a href="/classificacao/{{ cliente }}/{{ mes }}" class="btn secondary">Mapear</a>
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
   </div>
 
   <div class="card">
-    <h2>4. Relatório</h2>
+    <h2>4. Movimentos planejados</h2>
+    <p class="hint">Movimentos que você pretende fazer neste mês (aparecem no relatório).</p>
+    <form
+      hx-post="/setup/{{ cliente }}/{{ mes }}/movimentos"
+      hx-target="#pipeline-panel"
+      hx-swap="outerHTML">
+      <textarea name="movimentos" placeholder="Vender X ações de PETR4&#10;Comprar X ações de ITSA4">{{ movimentos_text }}</textarea>
+      <div style="margin-top:10px;">
+        <button type="submit">Salvar movimentos planejados</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>5. Relatório</h2>
     {% if gate.ready %}
     <p class="hint">Dados obrigatórios prontos. Ajuste o aporte simulado e gere o relatório.</p>
     {% else %}

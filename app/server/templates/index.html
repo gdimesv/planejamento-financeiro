@@ -14,6 +14,7 @@
     {% for cliente in clientes %}
     <div class="card">
       <h2>{{ cliente.id }}</h2>
+      <p class="nav-links"><a href="/objetivos/{{ cliente.id }}">Objetivos</a></p>
       <ul class="month-list">
         {% for mes in cliente.meses %}
         <li>

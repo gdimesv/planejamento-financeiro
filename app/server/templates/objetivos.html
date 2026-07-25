@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Objetivos - {{ cliente }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="page">
+    <p class="eyebrow"><a href="/">Planejamento Financeiro</a> &middot; {{ cliente }}</p>
+    <h1>Objetivos de {{ cliente }}</h1>
+
+    <div class="card">
+      <form method="post" action="/objetivos/{{ cliente }}">
+        <label for="nome">Nome do cliente</label>
+        <input type="text" id="nome" name="nome" value="{{ nome }}">
+
+        <div style="margin-top:12px;">
+          <label for="aporte_mensal_padrao">Aporte mensal padrão (R$)</label>
+          <input type="number" step="100" id="aporte_mensal_padrao" name="aporte_mensal_padrao" value="{{ aporte_mensal_padrao }}">
+        </div>
+
+        <p class="hint" style="margin-top:16px;">
+          Uma linha por objetivo: <code>id,descricao,tipo,valor_alvo,prazo_meses,prioridade</code>.
+          <code>tipo</code>: valor_alvo, renda_passiva_mensal ou valor_presente. <code>prioridade</code>: alta, media ou baixa.
+          <code>prazo_meses</code> pode ficar em branco. Salvar substitui a lista inteira.<br>
+          Exemplo: <code>caixa_120k,120K Caixa,valor_alvo,120000,,alta</code>
+        </p>
+        <textarea name="objetivos_text" rows="8" placeholder="caixa_120k,120K Caixa,valor_alvo,120000,,alta">{{ objetivos_text }}</textarea>
+
+        <div style="margin-top:12px;">
+          <button type="submit">Salvar objetivos</button>
+        </div>
+      </form>
+      {% if saved %}<p class="hint" style="margin-top:12px;">Objetivos salvos com sucesso.</p>{% endif %}
+    </div>
+  </div>
+</body>
+</html>

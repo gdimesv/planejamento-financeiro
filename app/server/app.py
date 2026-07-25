@@ -19,6 +19,15 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from pipeline.gate import evaluate_gate
+from pipeline.goals import (
+    load_asset_map,
+    load_ativos_mes,
+    load_objetivos,
+    load_planned_moves,
+    save_asset_map,
+    save_objetivos,
+    save_planned_moves,
+)
 from pipeline.orchestrator import save_internacional
 from pipeline.state import (
     MonthState,
@@ -242,7 +251,93 @@ def _panel_context(cliente: str, mes: str, oob: bool = False) -> dict:
         "diag_steps": [steps_by_id["classificacao"], steps_by_id["mom"]],
         "gate": evaluate_gate(state),
         "aporte_default": _aporte_default(cliente),
+        "movimentos_text": load_planned_moves(cliente, mes),
         "oob": oob,
+    }
+
+
+# --- Helpers de objetivos ---
+
+def _is_blank(value) -> bool:
+    return value is None or value == "" or (isinstance(value, float) and value != value)
+
+
+def _objetivos_text(data: dict) -> str:
+    lines = []
+    for o in data.get("objetivos", []):
+        prazo = o.get("prazo_meses")
+        valor_alvo = o.get("valor_alvo")
+        lines.append(
+            ",".join(
+                [
+                    str(o.get("id", "")),
+                    str(o.get("descricao", "")),
+                    str(o.get("tipo", "")),
+                    "" if _is_blank(valor_alvo) else str(valor_alvo),
+                    "" if _is_blank(prazo) else str(int(prazo)) if float(prazo).is_integer() else str(prazo),
+                    str(o.get("prioridade", "")),
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
+def _parse_objetivos_text(texto: str) -> list[dict]:
+    objetivos = []
+    for line in texto.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [p.strip() for p in line.split(",")]
+        parts += [""] * (6 - len(parts))
+        oid, descricao, tipo, valor_alvo, prazo_meses, prioridade = parts[:6]
+        if not oid:
+            continue
+        objetivos.append(
+            {
+                "id": oid,
+                "descricao": descricao,
+                "tipo": tipo or "valor_alvo",
+                "valor_alvo": float(valor_alvo) if valor_alvo else 0.0,
+                "prazo_meses": int(float(prazo_meses)) if prazo_meses else None,
+                "prioridade": prioridade or "media",
+            }
+        )
+    return objetivos
+
+
+# --- Helpers de classificacao de ativos ---
+
+def _classificacao_context(cliente: str, mes: str, somente_novos: bool, saved: bool = False) -> dict:
+    objetivos = load_objetivos(cliente).get("objetivos", [])
+    objetivo_ids = [o.get("id", "") for o in objetivos if o.get("id")]
+
+    ativos_df = load_ativos_mes(cliente, mes)
+    mapa_df = load_asset_map(cliente)
+
+    if not ativos_df.empty:
+        merged = ativos_df.merge(mapa_df, how="left", on="ativo")
+    else:
+        merged = mapa_df.copy()
+        if "classe_macro" not in merged.columns:
+            merged["classe_macro"] = ""
+        if "valor_total" not in merged.columns:
+            merged["valor_total"] = 0.0
+
+    if "peso" not in merged.columns:
+        merged["peso"] = 1.0
+    merged["peso"] = merged["peso"].fillna(1.0)
+
+    if somente_novos:
+        merged = merged[merged["objetivo_id"].isna() | (merged["objetivo_id"].astype(str).str.strip() == "")]
+
+    return {
+        "cliente": cliente,
+        "mes": mes,
+        "objetivo_ids": objetivo_ids,
+        "rows": merged.to_dict(orient="records"),
+        "somente_novos": somente_novos,
+        "saved": saved,
     }
 
 
@@ -309,4 +404,86 @@ def setup_generate_report(request: Request, cliente: str, mes: str, aporte: floa
     run_report(cliente, mes, aporte)
     return templates.TemplateResponse(
         "_report_result.html", {"request": request, "ok": True, "cliente": cliente, "mes": mes}
+    )
+
+
+@app.post("/setup/{cliente}/{mes}/movimentos", response_class=HTMLResponse)
+def setup_movimentos(request: Request, cliente: str, mes: str, movimentos: str = Form("")):
+    save_planned_moves(cliente, mes, movimentos)
+    return templates.TemplateResponse(
+        "_panel.html", {"request": request, **_panel_context(cliente, mes)}
+    )
+
+
+@app.get("/objetivos/{cliente}", response_class=HTMLResponse)
+def objetivos_page(request: Request, cliente: str):
+    data = load_objetivos(cliente)
+    return templates.TemplateResponse(
+        "objetivos.html",
+        {
+            "request": request,
+            "cliente": cliente,
+            "nome": data.get("cliente", {}).get("nome", cliente.title()),
+            "aporte_mensal_padrao": float(data.get("aporte_mensal_padrao", 0.0) or 0.0),
+            "objetivos_text": _objetivos_text(data),
+            "saved": False,
+        },
+    )
+
+
+@app.post("/objetivos/{cliente}", response_class=HTMLResponse)
+def objetivos_save(
+    request: Request,
+    cliente: str,
+    nome: str = Form(...),
+    aporte_mensal_padrao: float = Form(0.0),
+    objetivos_text: str = Form(""),
+):
+    payload = {
+        "cliente": {"id": cliente, "nome": nome},
+        "aporte_mensal_padrao": float(aporte_mensal_padrao),
+        "objetivos": _parse_objetivos_text(objetivos_text),
+    }
+    save_objetivos(cliente, payload)
+    return templates.TemplateResponse(
+        "objetivos.html",
+        {
+            "request": request,
+            "cliente": cliente,
+            "nome": nome,
+            "aporte_mensal_padrao": aporte_mensal_padrao,
+            "objetivos_text": objetivos_text,
+            "saved": True,
+        },
+    )
+
+
+@app.get("/classificacao/{cliente}/{mes}", response_class=HTMLResponse)
+def classificacao_page(request: Request, cliente: str, mes: str, somente_novos: bool = True):
+    return templates.TemplateResponse(
+        "classificacao.html", {"request": request, **_classificacao_context(cliente, mes, somente_novos)}
+    )
+
+
+@app.post("/classificacao/{cliente}/{mes}", response_class=HTMLResponse)
+def classificacao_save(
+    request: Request,
+    cliente: str,
+    mes: str,
+    ativo: list[str] = Form(default=[]),
+    objetivo_id: list[str] = Form(default=[]),
+    peso: list[str] = Form(default=[]),
+    somente_novos: bool = Form(False),
+):
+    edited_rows = [{"ativo": a, "objetivo_id": o, "peso": p} for a, o, p in zip(ativo, objetivo_id, peso)]
+    if somente_novos:
+        mapa_df = load_asset_map(cliente)
+        if not mapa_df.empty:
+            edited_assets = {r["ativo"] for r in edited_rows}
+            existing = mapa_df[~mapa_df["ativo"].astype(str).isin(edited_assets)]
+            edited_rows = existing.to_dict(orient="records") + edited_rows
+    save_asset_map(cliente, edited_rows)
+    return templates.TemplateResponse(
+        "classificacao.html",
+        {"request": request, **_classificacao_context(cliente, mes, somente_novos, saved=True)},
     )

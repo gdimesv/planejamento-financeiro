@@ -128,7 +128,7 @@ button:disabled {
   cursor: not-allowed;
 }
 
-textarea, input[type="number"], input[type="text"] {
+textarea, input[type="number"], input[type="text"], select {
   font: inherit;
   width: 100%;
   border: 1px solid var(--line);
@@ -136,6 +136,11 @@ textarea, input[type="number"], input[type="text"] {
   padding: 8px 10px;
   background: var(--surface-muted);
   color: var(--ink);
+}
+
+label {
+  font-weight: 600;
+  font-size: 0.88rem;
 }
 
 textarea {
@@ -186,3 +191,33 @@ a { color: var(--accent); }
 }
 
 .month-list li:first-child { border-top: none; }
+
+.nav-links {
+  margin: 0 0 18px;
+  font-size: 0.88rem;
+}
+
+.asset-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.asset-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.asset-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+}
+
+.asset-table select, .asset-table input[type="number"] {
+  min-width: 100px;
+}
