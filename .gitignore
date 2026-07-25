@@ -11,3 +11,7 @@ env/
 clientes/
 *.bak-*
 
+node_modules/
+scripts/suno-fiis/.suno-session/
+scripts/suno-acoes/.suno-session/
+

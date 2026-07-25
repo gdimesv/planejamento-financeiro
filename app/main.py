@@ -17,6 +17,7 @@ from core.classification import classify_positions
 from core.metrics import (
     build_fii_recommendation_actions,
     build_mom_table_rows,
+    build_stock_recommendation_actions,
     build_trade_rows,
     classify_cashflows,
     current_position,
@@ -120,6 +121,7 @@ def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
     compras_vendas = build_trade_rows(df_m0, df_m1)
     resumo_compras_vendas = summarize_trade_rows(compras_vendas)
     recomendacoes_fii = build_fii_recommendation_actions(df_m0, raw.get("fii_recommendations", pd.DataFrame()))
+    recomendacoes_acoes = build_stock_recommendation_actions(df_m0, raw.get("stock_recommendations", pd.DataFrame()))
     rent = portfolio_return(df_extrato, pos["total"])
     if "data" in df_extrato.columns:
         df_extrato_mes = df_extrato[df_extrato["data"].astype(str).str.startswith(mes)]
@@ -142,6 +144,7 @@ def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
         "mom_linhas": mom_linhas,
         "compras_vendas": resumo_compras_vendas,
         "recomendacoes_fii": recomendacoes_fii,
+        "recomendacoes_acoes": recomendacoes_acoes,
         "objetivos": goals,
         "ativos_nao_mapeados": unmapped_assets,
         "rentabilidade": rent,

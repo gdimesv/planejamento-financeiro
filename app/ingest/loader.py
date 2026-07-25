@@ -82,9 +82,14 @@ def load_month_inputs(current_month_dir: Path) -> Dict[str, pd.DataFrame]:
         name = path.name.lower()
         return "fii" in name and ("recomend" in name or "carteira" in name)
 
+    def is_stock_recommendation(path: Path) -> bool:
+        name = path.name.lower()
+        return "acoes" in name and ("recomend" in name or "carteira" in name)
+
     extratos = [p for p in files_current if p.is_file() and "extrato" in p.name.lower()]
     m0_files = [p for p in files_current if p.is_file() and "m0" in p.name.lower()]
     fii_recommendation_files = [p for p in files_current if p.is_file() and is_fii_recommendation(p)]
+    stock_recommendation_files = [p for p in files_current if p.is_file() and is_stock_recommendation(p)]
 
     files_prev = list(prev_dir.glob("*")) if prev_dir.exists() else []
     # Snapshot do mes anterior = arquivos `m0` guardados na pasta do mes anterior
@@ -131,4 +136,5 @@ def load_month_inputs(current_month_dir: Path) -> Dict[str, pd.DataFrame]:
         "m0": load_many(m0_files, lambda p: load_position(p, cliente_id)),
         "m1": load_many(m1_files, lambda p: load_position(p, cliente_id)),
         "fii_recommendations": load_many(fii_recommendation_files, _read_any_table),
+        "stock_recommendations": load_many(stock_recommendation_files, _read_any_table),
     }
