@@ -163,10 +163,12 @@ def _build_insights(payload: dict, allocation_chart: list[dict], action_plan: li
     mom = payload.get("mom", {})
     rent = payload.get("rentabilidade", {})
     fluxos = payload.get("fluxos_extrato", {})
+    fluxos_externos = payload.get("fluxos_externos", {})
     variacao_total = _num(mom.get("variacao_total"))
     variacao_pct = _num(mom.get("variacao_percentual"))
     resultado_mes = _num(rent.get("resultado_mes"))
     liquido_fluxos = _num(fluxos.get("liquido"))
+    aporte_liquido_externo = _num(fluxos_externos.get("aporte_liquido_externo"))
 
     variation_rows = _build_variation_chart(payload.get("posicao", {}))
     best = next((row for row in variation_rows if row["valor"] > 0), None)
@@ -182,7 +184,7 @@ def _build_insights(payload: dict, allocation_chart: list[dict], action_plan: li
         {
             "label": "Resultado",
             "title": "Resultado positivo" if resultado_mes > 0 else "Resultado negativo" if resultado_mes < 0 else "Resultado neutro",
-            "detail": "Rentabilidade estimada calculada a partir do resultado do extrato e patrimônio atual.",
+            "detail": "Rentabilidade absoluta estimada: variação total do patrimônio menos aportes e retiradas externas do mês.",
             "tone": _tone(resultado_mes),
         },
         {
@@ -192,6 +194,19 @@ def _build_insights(payload: dict, allocation_chart: list[dict], action_plan: li
             "tone": _tone(liquido_fluxos),
         },
     ]
+
+    if aporte_liquido_externo != 0:
+        valor_fmt = _format_currency(abs(aporte_liquido_externo))
+        insights.append(
+            {
+                "label": "Aporte externo",
+                "title": "Entrou dinheiro novo" if aporte_liquido_externo > 0 else "Saiu dinheiro da conta",
+                "detail": f"{valor_fmt} identificado no extrato como transferência "
+                + ("recebida" if aporte_liquido_externo > 0 else "enviada")
+                + " neste mês — não é rentabilidade da carteira, é aporte/retirada externa.",
+                "tone": "positive" if aporte_liquido_externo > 0 else "negative",
+            }
+        )
 
     if best:
         insights.append(
@@ -234,11 +249,31 @@ def _build_insights(payload: dict, allocation_chart: list[dict], action_plan: li
     return insights
 
 
+def _format_currency(value: float) -> str:
+    return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _build_variacao_note(mom: dict, rent: dict, fluxos_externos: dict) -> str:
+    variacao_total = _num(mom.get("variacao_total"))
+    aporte_liquido = _num(fluxos_externos.get("aporte_liquido_externo"))
+    resultado_mes = _num(rent.get("resultado_mes"))
+    if variacao_total == 0:
+        return ""
+    aporte_label = "aporte" if aporte_liquido >= 0 else "retirada"
+    resultado_label = "rentabilidade estimada" if resultado_mes >= 0 else "perda estimada"
+    return (
+        f"{aporte_label.capitalize()} do mês: {_format_currency(abs(aporte_liquido))}"
+        f" · {resultado_label.capitalize()}: {_format_currency(abs(resultado_mes))}"
+        " (realocações entre fundos/bolsa não entram, são neutras no total)."
+    )
+
+
 def build_report_view_model(payload: dict) -> dict:
     posicao = payload.get("posicao", {})
     mom = payload.get("mom", {})
     rent = payload.get("rentabilidade", {})
     fluxos = payload.get("fluxos_extrato", {})
+    fluxos_externos = payload.get("fluxos_externos", {})
     objetivos = list(payload.get("objetivos", []))
     sugestoes = list(payload.get("sugestoes", []))
 
@@ -262,13 +297,14 @@ def build_report_view_model(payload: dict) -> dict:
             "tone": _tone(_num(mom.get("variacao_total"))),
             "context_value": _num(mom.get("variacao_percentual")),
             "context_kind": "percent",
+            "note": _build_variacao_note(mom, rent, fluxos_externos),
         },
         {
             "label": "Rentabilidade estimada",
             "value": _num(rent.get("rentabilidade_pct")),
             "kind": "percent",
             "tone": _tone(_num(rent.get("rentabilidade_pct"))),
-            "context": "Com base no extrato",
+            "context": "Variação menos aportes/retiradas externas",
         },
         {
             "label": "Caixa disponível",

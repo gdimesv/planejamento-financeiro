@@ -198,6 +198,13 @@ h3 {
   font-size: 0.86rem;
 }
 
+.kpi-note {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-style: italic;
+}
+
 .insight-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -486,6 +493,24 @@ td.num,
 th.num {
   text-align: right;
   white-space: nowrap;
+}
+
+thead tr.filters th {
+  padding-top: 4px;
+  padding-bottom: 8px;
+}
+
+thead tr.filters input,
+thead tr.filters select {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 400;
+  text-transform: none;
+  color: var(--ink);
+  background: var(--surface);
 }
 
 .badge {

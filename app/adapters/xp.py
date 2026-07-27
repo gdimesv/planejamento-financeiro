@@ -127,8 +127,14 @@ def parse_xp_position(path: Path, cliente_id: str) -> pd.DataFrame:
         if value_total <= 0:
             continue
 
-        quantity = _parse_number(c7) if not pd.isna(c7) else _parse_number(c6)
-        price = _parse_brl(c6) if not pd.isna(c6) else 0.0
+        if not pd.isna(c7):
+            # Layout de FIIs: preco medio/ultima cotacao em c5/c6, quantidade de cotas em c7.
+            quantity = _parse_number(c7)
+            price = _parse_brl(c6) if not pd.isna(c6) else 0.0
+        else:
+            # Layout de Acoes: preco medio/ultimo preco em c4/c5, quantidade em c6.
+            quantity = _parse_number(c6) if not pd.isna(c6) else 0.0
+            price = _parse_brl(c5) if not pd.isna(c5) else 0.0
         if price == 0.0 and quantity > 0:
             price = value_total / quantity
 

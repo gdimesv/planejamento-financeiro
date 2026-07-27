@@ -118,13 +118,39 @@ def current_position(df_m0: pd.DataFrame, df_m1: pd.DataFrame | None = None) -> 
     }
 
 
+def _decompose_variacao(qty0: float, qty1: float, v0: float, v1: float) -> tuple[float | None, float | None]:
+    """Separa a variacao de um ativo em efeito quantidade (compra/venda) e efeito preco (mercado).
+
+    So decompoe quando ha quantidade confiavel nos dois meses (qty0>0 e qty1>0);
+    para posicoes novas/encerradas ou classes sem quantidade no parser (Fundos,
+    COE, Renda Fixa, Tesouro Direto, ativos internacionais) retorna None, None.
+    """
+    if qty0 <= 0 or qty1 <= 0:
+        return None, None
+    preco0 = v0 / qty0
+    preco1 = v1 / qty1
+    efeito_quantidade = (qty0 - qty1) * preco0
+    efeito_preco = qty1 * (preco0 - preco1)
+    return efeito_quantidade, efeito_preco
+
+
 def mom_variation(df_m0: pd.DataFrame, df_m1: pd.DataFrame) -> Dict[str, object]:
     if df_m0.empty and df_m1.empty:
         return {"variacao_total": 0.0, "variacao_percentual": 0.0, "por_ativo": {}}
 
     m0 = df_m0.groupby("ativo", dropna=False)["valor_total"].sum().rename("m0")
     m1 = df_m1.groupby("ativo", dropna=False)["valor_total"].sum().rename("m1")
-    joined = pd.concat([m0, m1], axis=1).fillna(0.0)
+    qty0 = (
+        df_m0.groupby("ativo", dropna=False)["quantidade"].sum().rename("qty0")
+        if "quantidade" in df_m0.columns
+        else pd.Series(dtype=float, name="qty0")
+    )
+    qty1 = (
+        df_m1.groupby("ativo", dropna=False)["quantidade"].sum().rename("qty1")
+        if "quantidade" in df_m1.columns
+        else pd.Series(dtype=float, name="qty1")
+    )
+    joined = pd.concat([m0, m1, qty0, qty1], axis=1).fillna(0.0)
     joined["variacao"] = joined["m0"] - joined["m1"]
     joined["variacao_pct"] = joined.apply(
         lambda row: (row["variacao"] / row["m1"] * 100.0) if row["m1"] != 0 else 0.0,
@@ -138,11 +164,17 @@ def mom_variation(df_m0: pd.DataFrame, df_m1: pd.DataFrame) -> Dict[str, object]
 
     per_asset: Dict[str, Dict[str, float]] = {}
     for asset, row in joined.sort_values("variacao", ascending=False).iterrows():
+        efeito_quantidade, efeito_preco = _decompose_variacao(
+            float(row["qty0"]), float(row["qty1"]), float(row["m0"]), float(row["m1"])
+        )
         per_asset[asset] = {
             "m0": float(row["m0"]),
             "m1": float(row["m1"]),
             "variacao": float(row["variacao"]),
             "variacao_pct": float(row["variacao_pct"]),
+            "efeito_quantidade": efeito_quantidade,
+            "efeito_preco": efeito_preco,
+            "decomponivel": efeito_quantidade is not None,
         }
 
     return {
@@ -207,6 +239,9 @@ def build_mom_table_rows(
                 "m1": float(dados["m1"]),
                 "variacao": float(dados["variacao"]),
                 "variacao_pct": float(dados["variacao_pct"]),
+                "efeito_quantidade": dados.get("efeito_quantidade"),
+                "efeito_preco": dados.get("efeito_preco"),
+                "decomponivel": bool(dados.get("decomponivel", False)),
             }
         )
     return linhas
@@ -379,6 +414,79 @@ def classify_cashflows(df_extrato: pd.DataFrame) -> Dict[str, object]:
     }
 
 
+def classify_external_flows(df_extrato: pd.DataFrame) -> Dict[str, object]:
+    """
+    Identifica no extrato aportes/retiradas externas (dinheiro entrando ou saindo
+    da conta) e realocacoes internas (aplicacao em fundos, resgates, compra/venda
+    em bolsa). Essas movimentacoes ja sao ignoradas por classify_cashflows (nao
+    sao ganho/perda), mas o cliente quer ve-las explicitamente para entender de
+    onde vem a variacao de patrimonio do mes (aporte novo vs. rentabilidade real).
+    """
+    empty = {
+        "eventos": [],
+        "total_aporte_externo": 0.0,
+        "total_retirada_externa": 0.0,
+        "aporte_liquido_externo": 0.0,
+        "total_movimentacao_interna": 0.0,
+    }
+    if df_extrato.empty or "resultado" not in df_extrato.columns:
+        return empty
+
+    df = df_extrato.copy()
+    if "data" not in df.columns:
+        df["data"] = ""
+    if "descricao" not in df.columns:
+        df["descricao"] = ""
+    df["resultado"] = pd.to_numeric(df["resultado"], errors="coerce").fillna(0.0)
+
+    def classify(desc_norm: str) -> str | None:
+        if "transferencia recebida" in desc_norm or "recebimento de ted" in desc_norm:
+            return "Aporte externo"
+        if "retirada em c/c" in desc_norm:
+            return "Retirada externa"
+        if "aplicacao fundos" in desc_norm:
+            return "Aplicação em fundo"
+        if "resgate" in desc_norm:
+            return "Resgate de fundo"
+        if "operacoes em bolsa" in desc_norm or "operacao em bolsa" in desc_norm:
+            return "Compra/venda em bolsa"
+        return None
+
+    eventos: List[Dict[str, object]] = []
+    for _, row in df.iterrows():
+        desc = str(row.get("descricao", ""))
+        tipo = classify(_normalize_text(desc))
+        if tipo is None:
+            continue
+        eventos.append(
+            {
+                "data": str(row.get("data", "")),
+                "descricao": desc,
+                "tipo": tipo,
+                "valor": float(row["resultado"]),
+            }
+        )
+
+    if not eventos:
+        return empty
+
+    total_aporte_externo = sum(e["valor"] for e in eventos if e["tipo"] == "Aporte externo")
+    total_retirada_externa = sum(e["valor"] for e in eventos if e["tipo"] == "Retirada externa")
+    total_movimentacao_interna = sum(
+        abs(e["valor"])
+        for e in eventos
+        if e["tipo"] in {"Aplicação em fundo", "Resgate de fundo", "Compra/venda em bolsa"}
+    )
+
+    return {
+        "eventos": sorted(eventos, key=lambda e: str(e["data"]), reverse=True),
+        "total_aporte_externo": float(total_aporte_externo),
+        "total_retirada_externa": float(total_retirada_externa),
+        "aporte_liquido_externo": float(total_aporte_externo + total_retirada_externa),
+        "total_movimentacao_interna": float(total_movimentacao_interna),
+    }
+
+
 def build_trade_rows(df_m0: pd.DataFrame, df_m1: pd.DataFrame) -> List[Dict[str, object]]:
     """Identifica compras e vendas por variacao de quantidade entre M1 e M0."""
     if df_m0.empty and df_m1.empty:
@@ -504,9 +612,12 @@ def normalize_stock_recommendations(df: pd.DataFrame) -> pd.DataFrame:
     return normalize_fii_recommendations(df)
 
 
-def build_stock_recommendation_actions(df_m0: pd.DataFrame, recommendation_df: pd.DataFrame) -> Dict[str, object]:
+def build_stock_recommendation_actions(
+    df_m0: pd.DataFrame, recommendation_df: pd.DataFrame, arquivo_encontrado: bool = False
+) -> Dict[str, object]:
     empty = {
         "disponivel": False,
+        "arquivo_encontrado": arquivo_encontrado,
         "acoes": [],
         "resumo": {"comprar": 0, "aumentar": 0, "aguardar": 0, "reduzir": 0, "encerrar": 0},
     }
@@ -605,12 +716,15 @@ def build_stock_recommendation_actions(df_m0: pd.DataFrame, recommendation_df: p
     }
 
     rows = sorted(rows, key=lambda row: (int(row["prioridade"]), float(row["rank_num"]), str(row["ticker"])))
-    return {"disponivel": True, "acoes": rows, "resumo": resumo}
+    return {"disponivel": True, "arquivo_encontrado": arquivo_encontrado, "acoes": rows, "resumo": resumo}
 
 
-def build_fii_recommendation_actions(df_m0: pd.DataFrame, recommendation_df: pd.DataFrame) -> Dict[str, object]:
+def build_fii_recommendation_actions(
+    df_m0: pd.DataFrame, recommendation_df: pd.DataFrame, arquivo_encontrado: bool = False
+) -> Dict[str, object]:
     empty = {
         "disponivel": False,
+        "arquivo_encontrado": arquivo_encontrado,
         "acoes": [],
         "resumo": {"comprar": 0, "aumentar": 0, "aguardar": 0, "reduzir": 0, "encerrar": 0},
     }
@@ -709,7 +823,7 @@ def build_fii_recommendation_actions(df_m0: pd.DataFrame, recommendation_df: pd.
     }
 
     rows = sorted(rows, key=lambda row: (int(row["prioridade"]), float(row["rank_num"]), str(row["ticker"])))
-    return {"disponivel": True, "acoes": rows, "resumo": resumo}
+    return {"disponivel": True, "arquivo_encontrado": arquivo_encontrado, "acoes": rows, "resumo": resumo}
 
 
 def summarize_trade_rows(rows: List[Dict[str, object]], top_n: int = 12) -> Dict[str, object]:
@@ -737,16 +851,20 @@ def summarize_trade_rows(rows: List[Dict[str, object]], top_n: int = 12) -> Dict
     }
 
 
-def portfolio_return(df_extrato: pd.DataFrame, current_total: float) -> Dict[str, float]:
-    if df_extrato.empty or current_total <= 0:
+def portfolio_return(variacao_total: float, aporte_liquido_externo: float, base_total: float) -> Dict[str, float]:
+    """
+    Rentabilidade absoluta estimada = variacao total do patrimonio (M0 - M1)
+    menos o aporte/retirada externa liquida do periodo. Realocacoes internas
+    (aplicacao em fundos, compra/venda em bolsa) trocam caixa por outro ativo
+    e por isso ja sao neutras na variacao total, nao precisando ser subtraidas
+    (ver classify_external_flows). O que sobra e proventos liquidos mais/menos
+    a valorizacao ou desvalorizacao de mercado dos ativos da carteira.
+    """
+    if base_total <= 0:
         return {"resultado_mes": 0.0, "rentabilidade_pct": 0.0}
 
-    result_col = "resultado" if "resultado" in df_extrato.columns else None
-    if not result_col:
-        return {"resultado_mes": 0.0, "rentabilidade_pct": 0.0}
-
-    result_value = float(df_extrato[result_col].sum())
-    return_pct = (result_value / current_total) * 100.0 if current_total else 0.0
+    result_value = variacao_total - aporte_liquido_externo
+    return_pct = (result_value / base_total) * 100.0
     return {"resultado_mes": result_value, "rentabilidade_pct": return_pct}
 
 

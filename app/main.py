@@ -20,6 +20,7 @@ from core.metrics import (
     build_stock_recommendation_actions,
     build_trade_rows,
     classify_cashflows,
+    classify_external_flows,
     current_position,
     mom_variation,
     portfolio_return,
@@ -120,14 +121,20 @@ def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
     mom_linhas = build_mom_table_rows(df_m0, df_m1, map_df, objetivo_id_para_descricao)
     compras_vendas = build_trade_rows(df_m0, df_m1)
     resumo_compras_vendas = summarize_trade_rows(compras_vendas)
-    recomendacoes_fii = build_fii_recommendation_actions(df_m0, raw.get("fii_recommendations", pd.DataFrame()))
-    recomendacoes_acoes = build_stock_recommendation_actions(df_m0, raw.get("stock_recommendations", pd.DataFrame()))
+    recomendacoes_fii = build_fii_recommendation_actions(
+        df_m0, raw.get("fii_recommendations", pd.DataFrame()), raw.get("fii_recommendation_files_found", False)
+    )
+    recomendacoes_acoes = build_stock_recommendation_actions(
+        df_m0, raw.get("stock_recommendations", pd.DataFrame()), raw.get("stock_recommendation_files_found", False)
+    )
     if "data" in df_extrato.columns:
         df_extrato_mes = df_extrato[df_extrato["data"].astype(str).str.startswith(mes)]
     else:
         df_extrato_mes = df_extrato
-    rent = portfolio_return(df_extrato_mes, pos["total"])
     fluxos_extrato = classify_cashflows(df_extrato_mes)
+    fluxos_externos = classify_external_flows(df_extrato_mes)
+    base_total_m1 = pos["total"] - mom["variacao_total"]
+    rent = portfolio_return(mom["variacao_total"], fluxos_externos["aporte_liquido_externo"], base_total_m1)
     historico_fluxos = build_cashflow_history(client_dir, mes)
     movimentos_planejados = load_planned_moves(client_dir, mes)
     goal_alloc = build_goal_allocation(df_m0, map_df)
@@ -150,6 +157,7 @@ def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
         "ativos_nao_mapeados": unmapped_assets,
         "rentabilidade": rent,
         "fluxos_extrato": fluxos_extrato,
+        "fluxos_externos": fluxos_externos,
         "historico_fluxos": historico_fluxos,
         "movimentos_planejados": movimentos_planejados,
         "sugestoes": sug,

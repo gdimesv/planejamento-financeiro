@@ -130,6 +130,9 @@
                 {{ item.context }}
               {% endif %}
             </div>
+            {% if item.note %}
+            <div class="kpi-note">{{ item.note }}</div>
+            {% endif %}
           </article>
           {% endfor %}
         </div>
@@ -375,6 +378,8 @@
             </div>
           </div>
           {{ recommendation_toggle_list(view.recomendacoes_fii_groups) }}
+          {% elif recomendacoes_fii.arquivo_encontrado %}
+          <p class="note">Encontramos um arquivo de carteira recomendada de FIIs para este mês, mas ele não tinha nenhuma linha de recomendação válida (provavelmente a coleta da Suno falhou ou salvou o CSV vazio). Rode novamente <code>./scripts/suno-fiis/run-suno-fiis.sh --cliente {{ cliente_id }} --mes {{ mes }}</code> e gere o relatório de novo.</p>
           {% else %}
           <p class="note">Nenhum arquivo de carteira recomendada de FIIs encontrado para este mês.</p>
           {% endif %}
@@ -404,6 +409,8 @@
             </div>
           </div>
           {{ recommendation_toggle_list(view.recomendacoes_acoes_groups) }}
+          {% elif recomendacoes_acoes.arquivo_encontrado %}
+          <p class="note">Encontramos um arquivo de carteira recomendada de Ações para este mês, mas ele não tinha nenhuma linha de recomendação válida (provavelmente a coleta da Suno falhou ou salvou o CSV vazio). Rode novamente <code>./scripts/suno-acoes/run-suno-acoes.sh --cliente {{ cliente_id }} --mes {{ mes }}</code> e gere o relatório de novo.</p>
           {% else %}
           <p class="note">Nenhum arquivo de carteira recomendada de ações encontrado para este mês.</p>
           {% endif %}
@@ -512,6 +519,55 @@
           <p class="note">Nenhum dividendo, provento, taxa ou imposto identificado no extrato deste mês.</p>
           {% endif %}
         </article>
+
+        <article class="card">
+          <h2>Aportes e movimentações externas identificadas</h2>
+          <p class="note">Transferências, TEDs, aplicações/resgates de fundos e operações em bolsa encontrados no extrato do mês. Isso explica parte da variação de patrimônio que não é rentabilidade (ver aba Rentabilidade e macro).</p>
+          {% if fluxos_externos.eventos %}
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Aporte externo</div>
+              <div class="summary-value positive">{{ fluxos_externos.total_aporte_externo|brl }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Retirada externa</div>
+              <div class="summary-value negative">{{ fluxos_externos.total_retirada_externa|brl }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Aporte líquido externo</div>
+              <div class="summary-value {{ 'positive' if fluxos_externos.aporte_liquido_externo > 0 else 'negative' if fluxos_externos.aporte_liquido_externo < 0 else 'neutral' }}">{{ fluxos_externos.aporte_liquido_externo|brl }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Movimentação interna (fundos/bolsa)</div>
+              <div class="summary-value neutral">{{ fluxos_externos.total_movimentacao_interna|brl }}</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="tabela-fluxos-externos" class="display compact stripe" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Tipo</th>
+                  <th>Descrição</th>
+                  <th class="num">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for evento in fluxos_externos.eventos %}
+                <tr>
+                  <td>{{ evento.data }}</td>
+                  <td>{{ evento.tipo }}</td>
+                  <td>{{ evento.descricao }}</td>
+                  <td class="num {{ 'positive' if evento.valor > 0 else 'negative' if evento.valor < 0 else 'neutral' }}" data-order="{{ evento.valor }}">{{ evento.valor|brl }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="note">Nenhuma transferência, aplicação/resgate de fundo ou operação em bolsa identificada no extrato deste mês.</p>
+          {% endif %}
+        </article>
       </section>
 
       <section class="section" id="mom" aria-label="Variação dos ativos">
@@ -529,6 +585,19 @@
                   <th class="num">M1</th>
                   <th class="num">Variação</th>
                   <th class="num">Variação %</th>
+                  <th class="num">Efeito compra/venda</th>
+                  <th class="num">Efeito preço</th>
+                </tr>
+                <tr class="filters">
+                  <th>Ativo</th>
+                  <th>Classe</th>
+                  <th>Objetivo</th>
+                  <th class="num">M0</th>
+                  <th class="num">M1</th>
+                  <th class="num">Variação</th>
+                  <th class="num">Variação %</th>
+                  <th class="num">Efeito compra/venda</th>
+                  <th class="num">Efeito preço</th>
                 </tr>
               </thead>
               <tbody>
@@ -541,6 +610,13 @@
                   <td class="num" data-order="{{ linha.m1 }}">{{ linha.m1|brl }}</td>
                   <td class="num {{ 'positive' if linha.variacao > 0 else 'negative' if linha.variacao < 0 else 'neutral' }}" data-order="{{ linha.variacao }}">{{ linha.variacao|brl }}</td>
                   <td class="num {{ 'positive' if linha.variacao_pct > 0 else 'negative' if linha.variacao_pct < 0 else 'neutral' }}" data-order="{{ linha.variacao_pct }}">{{ linha.variacao_pct|pct }}</td>
+                  {% if linha.decomponivel %}
+                  <td class="num {{ 'positive' if linha.efeito_quantidade > 0 else 'negative' if linha.efeito_quantidade < 0 else 'neutral' }}" data-order="{{ linha.efeito_quantidade }}">{{ linha.efeito_quantidade|brl }}</td>
+                  <td class="num {{ 'positive' if linha.efeito_preco > 0 else 'negative' if linha.efeito_preco < 0 else 'neutral' }}" data-order="{{ linha.efeito_preco }}">{{ linha.efeito_preco|brl }}</td>
+                  {% else %}
+                  <td class="num neutral" data-order="0" title="Sem quantidade/preço confiáveis para esta classe (Fundos, COE, Renda Fixa, Tesouro Direto ou ativos internacionais)">-</td>
+                  <td class="num neutral" data-order="0" title="Sem quantidade/preço confiáveis para esta classe (Fundos, COE, Renda Fixa, Tesouro Direto ou ativos internacionais)">-</td>
+                  {% endif %}
                 </tr>
               {% endfor %}
               </tbody>
@@ -605,13 +681,51 @@
             return isNaN(n) ? 0 : n;
           });
       };
+      var momSelectColumns = [1, 2];
       $('#tabela-mom').DataTable({
         order: [[5, 'desc']],
+        orderCellsTop: true,
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'Todos']],
-        columnDefs: [{ targets: [3, 4, 5, 6], orderDataType: 'dom-data-order-num' }],
+        columnDefs: [{ targets: [3, 4, 5, 6, 7, 8], orderDataType: 'dom-data-order-num' }],
         language: {
           url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
+        },
+        initComplete: function () {
+          var api = this.api();
+          $('#tabela-mom thead tr.filters th').each(function (colIndex) {
+            var column = api.column(colIndex);
+            var cell = $(this);
+            var title = cell.text();
+
+            if (momSelectColumns.indexOf(colIndex) !== -1) {
+              var select = $('<select><option value="">Todos</option></select>')
+                .appendTo(cell.empty())
+                .on('change', function () {
+                  var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                  column.search(val ? '^' + val + '$' : '', true, false).draw();
+                });
+              column
+                .data()
+                .unique()
+                .sort()
+                .each(function (d) {
+                  var text = $('<div>').html(d).text();
+                  select.append('<option value="' + text + '">' + text + '</option>');
+                });
+            } else {
+              $('<input type="text" placeholder="Filtrar ' + title + '" />')
+                .appendTo(cell.empty())
+                .on('click', function (e) {
+                  e.stopPropagation();
+                })
+                .on('keyup change clear', function () {
+                  if (column.search() !== this.value) {
+                    column.search(this.value).draw();
+                  }
+                });
+            }
+          });
         }
       });
       $('#tabela-fluxos').DataTable({
@@ -619,6 +733,15 @@
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'Todos']],
         columnDefs: [{ targets: [4], orderDataType: 'dom-data-order-num' }],
+        language: {
+          url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
+        }
+      });
+      $('#tabela-fluxos-externos').DataTable({
+        order: [[0, 'desc']],
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'Todos']],
+        columnDefs: [{ targets: [3], orderDataType: 'dom-data-order-num' }],
         language: {
           url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/pt-BR.json'
         }

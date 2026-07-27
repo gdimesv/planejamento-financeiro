@@ -219,9 +219,11 @@ async function main() {
   const rowsByTicker = new Map();
   let lastCount = 0;
   let stableRounds = 0;
+  let candidatosVistos = 0;
 
   for (let round = 0; round < 120 && stableRounds < 8; round += 1) {
     const visibleRows = await collectVisibleRows(page);
+    candidatosVistos += visibleRows.length;
     for (const raw of visibleRows) {
       const parsed = parseRow(raw);
       if (parsed?.ticker) rowsByTicker.set(parsed.ticker, parsed);
@@ -242,6 +244,23 @@ async function main() {
   }
 
   const rows = [...rowsByTicker.values()].sort((a, b) => Number(a.rank || 9999) - Number(b.rank || 9999));
+
+  if (rows.length === 0) {
+    const screenshotPath = csvPath.replace(/\.csv$/, "_falha.png");
+    await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+    console.error("ERRO: nenhuma linha de FII foi reconhecida na pagina.");
+    console.error(
+      candidatosVistos === 0
+        ? "Nenhum elemento parecido com uma tabela de carteira foi encontrado (login pode nao ter sido concluido a tempo, ou o layout da pagina mudou)."
+        : `Foram vistos ${candidatosVistos} elementos candidatos, mas nenhum tinha rank + vies reconheciveis (o layout da Suno pode ter mudado o formato das linhas).`,
+    );
+    console.error(`Screenshot de diagnostico salvo em: ${screenshotPath}`);
+    console.error(`CSV existente NAO foi sobrescrito: ${csvPath}`);
+    process.exitCode = 1;
+    await browser.close();
+    return;
+  }
+
   const csv = [
     headers.map(csvEscape).join(";"),
     ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(";")),

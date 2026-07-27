@@ -59,7 +59,7 @@ def _read_manual_international_position(path: Path) -> pd.DataFrame:
     return pd.DataFrame()
 
 
-def load_month_inputs(current_month_dir: Path) -> Dict[str, pd.DataFrame]:
+def load_month_inputs(current_month_dir: Path) -> Dict[str, object]:
     """
     Carrega extrato e posicao M0 da pasta do mes de referencia.
 
@@ -137,4 +137,6 @@ def load_month_inputs(current_month_dir: Path) -> Dict[str, pd.DataFrame]:
         "m1": load_many(m1_files, lambda p: load_position(p, cliente_id)),
         "fii_recommendations": load_many(fii_recommendation_files, _read_any_table),
         "stock_recommendations": load_many(stock_recommendation_files, _read_any_table),
+        "fii_recommendation_files_found": bool(fii_recommendation_files),
+        "stock_recommendation_files_found": bool(stock_recommendation_files),
     }
