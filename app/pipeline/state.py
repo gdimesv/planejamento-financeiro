@@ -211,11 +211,11 @@ def compute_month_state(cliente_id: str, mes: str) -> MonthState:
     )
     internacional = _file_step(
         "internacional",
-        "Posicao internacional (manual)",
+        "Posicao internacional (XP International)",
         base,
         _is_internacional,
         required=False,
-        pending_detail="Informe manualmente a posicao consolidada internacional.",
+        pending_detail="Suba o extrato em PDF da XP International com a cotacao USD/BRL do dia.",
     )
 
     classificacao = _classificacao_step(cliente_id, mes, xp_posicao.status == StepStatus.OK)

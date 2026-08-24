@@ -20,6 +20,7 @@ from core.metrics import (
     build_stock_recommendation_actions,
     build_trade_rows,
     classify_cashflows,
+    classify_dividends_usd,
     classify_external_flows,
     current_position,
     mom_variation,
@@ -84,6 +85,33 @@ def build_cashflow_history(client_dir: Path, mes_limite: str) -> dict:
     return {"por_mes": rows, "max_abs_mensal": float(max_abs)}
 
 
+def build_dividend_history_usd(client_dir: Path, mes_limite: str) -> dict:
+    """
+    Mesma abordagem de build_cashflow_history, mas para os dividendos em USD
+    da XP International: revarre inputs/<mes>/dividendos_xp_int_<mes>.csv de
+    todos os meses ate mes_limite. Diferente do extrato BR, cada PDF cobre
+    exatamente um mes civil sem sobreposicao, entao nao precisa de dedupe.
+    """
+    inputs_dir = client_dir / "inputs"
+    if not inputs_dir.exists():
+        return {"por_mes": [], "max_abs_mensal": 0.0}
+
+    monthly: dict[str, dict] = {}
+    for month_dir in sorted(inputs_dir.iterdir(), key=lambda p: p.name):
+        if not month_dir.is_dir() or month_dir.name == "_templates" or month_dir.name > mes_limite:
+            continue
+        raw = load_month_inputs(month_dir)
+        div = classify_dividends_usd(raw.get("dividendos_usd", pd.DataFrame()))
+        if not div["eventos"]:
+            continue
+        row = monthly.setdefault(month_dir.name, {"mes": month_dir.name, "total_usd": 0.0})
+        row["total_usd"] += div["total_usd"]
+
+    rows = [monthly[key] for key in sorted(monthly)]
+    max_abs = max([abs(float(row["total_usd"])) for row in rows] + [1.0])
+    return {"por_mes": rows, "max_abs_mensal": float(max_abs)}
+
+
 def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
     root = Path(__file__).resolve().parents[1]
     client_dir = root / "clientes" / cliente_id
@@ -136,6 +164,8 @@ def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
     base_total_m1 = pos["total"] - mom["variacao_total"]
     rent = portfolio_return(mom["variacao_total"], fluxos_externos["aporte_liquido_externo"], base_total_m1)
     historico_fluxos = build_cashflow_history(client_dir, mes)
+    dividendos_usd = classify_dividends_usd(raw.get("dividendos_usd", pd.DataFrame()))
+    historico_dividendos_usd = build_dividend_history_usd(client_dir, mes)
     movimentos_planejados = load_planned_moves(client_dir, mes)
     goal_alloc = build_goal_allocation(df_m0, map_df)
     goals = evaluate_goals(config.get("objetivos", []), pos["por_classe"], pos["total"], goal_alloc)
@@ -159,6 +189,8 @@ def run(cliente_id: str, mes: str, aporte_mensal: float) -> Path:
         "fluxos_extrato": fluxos_extrato,
         "fluxos_externos": fluxos_externos,
         "historico_fluxos": historico_fluxos,
+        "dividendos_usd": dividendos_usd,
+        "historico_dividendos_usd": historico_dividendos_usd,
         "movimentos_planejados": movimentos_planejados,
         "sugestoes": sug,
         "macro": macro,

@@ -90,6 +90,7 @@ def load_month_inputs(current_month_dir: Path) -> Dict[str, object]:
     m0_files = [p for p in files_current if p.is_file() and "m0" in p.name.lower()]
     fii_recommendation_files = [p for p in files_current if p.is_file() and is_fii_recommendation(p)]
     stock_recommendation_files = [p for p in files_current if p.is_file() and is_stock_recommendation(p)]
+    dividendos_usd_files = [p for p in files_current if p.is_file() and "dividendos" in p.name.lower()]
 
     files_prev = list(prev_dir.glob("*")) if prev_dir.exists() else []
     # Snapshot do mes anterior = arquivos `m0` guardados na pasta do mes anterior
@@ -139,4 +140,5 @@ def load_month_inputs(current_month_dir: Path) -> Dict[str, object]:
         "stock_recommendations": load_many(stock_recommendation_files, _read_any_table),
         "fii_recommendation_files_found": bool(fii_recommendation_files),
         "stock_recommendation_files_found": bool(stock_recommendation_files),
+        "dividendos_usd": load_many(dividendos_usd_files, _read_any_table),
     }

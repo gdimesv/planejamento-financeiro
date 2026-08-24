@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import tempfile
 from pathlib import Path
 
 # Garante que os modulos do motor (core, ingest, main, pipeline) estejam no path,
@@ -12,12 +11,11 @@ if str(APP_DIR) not in sys.path:
 
 import yaml
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from ingest.loader import _read_manual_international_position, month_previous
 from pipeline.gate import evaluate_gate
 from pipeline.goals import (
     load_asset_map,
@@ -29,7 +27,7 @@ from pipeline.goals import (
     save_objetivos,
     save_planned_moves,
 )
-from pipeline.orchestrator import save_internacional
+from pipeline.orchestrator import save_internacional_from_pdf
 from pipeline.state import (
     MonthState,
     Step,
@@ -84,16 +82,6 @@ def _state_payload(state: MonthState) -> dict:
 
 # --- Modelos de entrada ---
 
-class InternacionalRow(BaseModel):
-    classe: str = ""
-    ativo: str
-    valor: float | str = ""
-
-
-class InternacionalBody(BaseModel):
-    rows: list[InternacionalRow]
-
-
 class ReportBody(BaseModel):
     aporte: float | None = None
 
@@ -119,12 +107,6 @@ def api_job(job_id: str) -> dict:
     if not job:
         raise HTTPException(404, "Job nao encontrado")
     return job.as_dict()
-
-
-@app.post("/api/internacional/{cliente}/{mes}")
-def api_internacional(cliente: str, mes: str, body: InternacionalBody) -> dict:
-    save_internacional(cliente, mes, [row.model_dump() for row in body.rows])
-    return _state_payload(compute_month_state(cliente, mes))
 
 
 @app.post("/api/report/{cliente}/{mes}")
@@ -215,59 +197,6 @@ def _collect_groups(state: MonthState) -> list[dict]:
     return groups
 
 
-def _find_internacional_file(month_dir: Path) -> Path | None:
-    if not month_dir.exists():
-        return None
-    for path in sorted(month_dir.glob("*")):
-        name = path.name.lower()
-        if path.is_file() and "m0" in name and any(
-            token in name for token in ("_int", "internacional", "exterior", "usa")
-        ):
-            return path
-    return None
-
-
-def _fmt_valor(valor: object) -> str:
-    texto = str(valor).strip().replace('"', "")
-    if "," in texto and "." not in texto:
-        texto = texto.replace(",", ".")
-    try:
-        num = float(texto)
-    except (TypeError, ValueError):
-        return str(valor).strip()
-    return str(int(num)) if num == int(num) else f"{num:.2f}"
-
-
-def _internacional_rows_from_month(cliente: str, mes: str) -> list[str]:
-    path = _find_internacional_file(month_input_dir(cliente, mes))
-    if path is None:
-        return []
-    df = _read_manual_international_position(path)
-    if df.empty:
-        return []
-    cols = {str(col).lower().strip(): col for col in df.columns}
-    classe_col, ativo_col, valor_col = cols.get("classe"), cols.get("ativo"), cols.get("valor atual (r$)")
-    if not (classe_col and ativo_col and valor_col):
-        return []
-    linhas = []
-    for _, row in df.iterrows():
-        ativo = str(row.get(ativo_col, "")).strip()
-        if not ativo or ativo.lower() == "nan":
-            continue
-        classe = str(row.get(classe_col, "")).strip()
-        linhas.append(f"{classe},{ativo},{_fmt_valor(row.get(valor_col, ''))}")
-    return linhas
-
-
-def _internacional_template_rows(cliente: str, mes: str) -> tuple[str, list[str]]:
-    """Linhas de referencia para o modelo de CSV: do mes atual, ou do mes anterior se ainda vazio."""
-    linhas = _internacional_rows_from_month(cliente, mes)
-    if linhas:
-        return mes, linhas
-    prev_mes = month_previous(mes)
-    return prev_mes, _internacional_rows_from_month(cliente, prev_mes)
-
-
 def _aporte_default(cliente: str) -> float:
     cfg_file = client_dir(cliente) / "objetivos.yaml"
     if not cfg_file.exists():
@@ -279,13 +208,11 @@ def _aporte_default(cliente: str) -> float:
 def _panel_context(cliente: str, mes: str, oob: bool = False) -> dict:
     state = compute_month_state(cliente, mes)
     steps_by_id = {s.id: s for s in state.steps}
-    template_mes, template_linhas = _internacional_template_rows(cliente, mes)
     return {
         "cliente": cliente,
         "mes": mes,
         "groups": _collect_groups(state),
         "internacional": steps_by_id["internacional"],
-        "internacional_template": {"mes": template_mes, "disponivel": bool(template_linhas)},
         "diag_steps": [steps_by_id["classificacao"], steps_by_id["mom"]],
         "gate": evaluate_gate(state),
         "aporte_default": _aporte_default(cliente),
@@ -420,32 +347,27 @@ def setup_job_status(cliente: str, mes: str, job_id: str) -> HTMLResponse:
     return HTMLResponse(banner + panel)
 
 
-@app.get("/setup/{cliente}/{mes}/internacional/modelo")
-def internacional_modelo(cliente: str, mes: str) -> Response:
-    _, linhas = _internacional_template_rows(cliente, mes)
-    csv_text = "\n".join(["Classe,Ativo,Valor Atual (R$)", *linhas]) + "\n"
-    return Response(
-        content=csv_text,
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="posicao_internacional_{mes}.csv"'},
-    )
-
-
 @app.post("/setup/{cliente}/{mes}/internacional", response_class=HTMLResponse)
-async def setup_internacional(request: Request, cliente: str, mes: str, arquivo: UploadFile = File(...)):
+async def setup_internacional(
+    request: Request, cliente: str, mes: str, arquivo: UploadFile = File(...), cotacao: float = Form(...)
+):
     conteudo = await arquivo.read()
     erro = None
-    with tempfile.NamedTemporaryFile(suffix=".csv") as tmp:
-        tmp.write(conteudo)
-        tmp.flush()
-        df = _read_manual_international_position(Path(tmp.name))
-
-    if df.empty:
-        erro = "CSV invalido: confira se as colunas Classe, Ativo e Valor Atual (R$) estao presentes."
+    nome = (arquivo.filename or "").lower()
+    if not nome.endswith(".pdf"):
+        erro = "Envie o extrato em PDF da XP International (Apex)."
+    elif cotacao <= 0:
+        erro = "Informe a cotação USD/BRL do dia (maior que zero)."
     else:
-        dest = month_input_dir(cliente, mes) / f"posicao_m0_xp_int_{mes}.csv"
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(conteudo)
+        try:
+            resumo = save_internacional_from_pdf(cliente, mes, conteudo, cotacao)
+        except Exception:
+            resumo = {"posicoes": 0, "dividendos": 0}
+        if resumo["posicoes"] == 0:
+            erro = (
+                "Não encontrei posições no PDF. Confira se é o extrato mensal completo "
+                "da XP International (não um resumo/print parcial)."
+            )
 
     return templates.TemplateResponse(
         "_panel.html",

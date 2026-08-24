@@ -33,12 +33,10 @@
   </div>
 
   <div class="card">
-    <h2>2. Posição internacional (manual)</h2>
+    <h2>2. Extrato internacional (XP US)</h2>
     <p class="hint">
-      Suba um CSV com as colunas <code>Classe,Ativo,Valor Atual (R$)</code>. Enviar substitui o mês inteiro.
-      {% if internacional_template.disponivel %}
-      Se preferir partir dos valores de {{ internacional_template.mes }}, <a href="/setup/{{ cliente }}/{{ mes }}/internacional/modelo">baixe o modelo já preenchido</a>, atualize os valores e envie de volta.
-      {% endif %}
+      Suba o extrato mensal em PDF da XP International (Apex Clearing) e informe a cotação USD/BRL do dia.
+      Enviar substitui o mês inteiro: refaz a posição internacional (convertida para BRL) e os dividendos em dólar do mês.
     </p>
     {% if internacional_error %}
     <ul class="reasons"><li>{{ internacional_error }}</li></ul>
@@ -58,9 +56,15 @@
       hx-target="#pipeline-panel"
       hx-swap="outerHTML"
       hx-encoding="multipart/form-data">
-      <input type="file" name="arquivo" accept=".csv" required>
+      <input type="file" name="arquivo" accept=".pdf" required>
       <div style="margin-top:10px;">
-        <button type="submit">Enviar CSV</button>
+        <label>
+          Cotação USD/BRL do dia
+          <input type="number" name="cotacao" step="0.0001" min="0" placeholder="ex.: 5.4231" required>
+        </label>
+      </div>
+      <div style="margin-top:10px;">
+        <button type="submit">Enviar extrato</button>
       </div>
     </form>
   </div>
