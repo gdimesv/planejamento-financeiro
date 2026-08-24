@@ -487,6 +487,38 @@ def classify_external_flows(df_extrato: pd.DataFrame) -> Dict[str, object]:
     }
 
 
+def classify_dividends_usd(df_dividendos: pd.DataFrame) -> Dict[str, object]:
+    """
+    Consolida os dividendos em USD extraidos do extrato da XP International.
+
+    As linhas ja chegam identificadas (evento CASH_DIVIDEND do PDF), sem
+    precisar de classificacao por palavra-chave como em classify_cashflows.
+    """
+    empty = {"total_usd": 0.0, "eventos": []}
+    if df_dividendos.empty or "valor_usd" not in df_dividendos.columns:
+        return empty
+
+    df = df_dividendos.copy()
+    df["valor_usd"] = pd.to_numeric(df["valor_usd"], errors="coerce").fillna(0.0)
+
+    eventos = [
+        {
+            "data": str(row.get("data", "")),
+            "ativo": str(row.get("ativo", "")),
+            "descricao": str(row.get("descricao", "")),
+            "valor_usd": float(row["valor_usd"]),
+        }
+        for _, row in df.iterrows()
+    ]
+    if not eventos:
+        return empty
+
+    return {
+        "total_usd": float(df["valor_usd"].sum()),
+        "eventos": sorted(eventos, key=lambda e: str(e["data"]), reverse=True),
+    }
+
+
 def build_trade_rows(df_m0: pd.DataFrame, df_m1: pd.DataFrame) -> List[Dict[str, object]]:
     """Identifica compras e vendas por variacao de quantidade entre M1 e M0."""
     if df_m0.empty and df_m1.empty:

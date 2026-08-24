@@ -88,7 +88,7 @@ Em **`clientes/<cliente>/inputs/<YYYY-MM>/`** voce guarda **so o mes de referenc
 - `posicao_m0_*.csv|xlsx` — posicao de fechamento **desse** mes (XP, etc.)
 - `carteira_*fii*recomend*.csv|xlsx` ou `*fii*carteira*.csv|xlsx` — carteira recomendada de FIIs do mes
 - `acoes_recomendadas_*.csv|xlsx` (nome com `acoes` + `recomend` ou `carteira`) — carteira recomendada de Ações/Dividendos do mes
-- Opcional: CSV internacional com `m0` no nome, mesmo mes
+- Opcional: posicao internacional (`posicao_m0_xp_int_*` + `dividendos_xp_int_*`), gerada automaticamente ao subir o extrato PDF da XP International no setup do mes
 
 ### Carteira recomendada de FIIs
 
@@ -118,29 +118,15 @@ Exemplo: relatorio de **2026-04** usa M0 de `.../inputs/2026-04/` e M1 a partir 
 
 Multiplos arquivos `m0` no mesmo mes sao somados (ex.: XP Brasil + internacional).
 
-### Carteira internacional manual (CSV simples)
+### Posicao internacional (extrato PDF da XP International)
 
-Para incluir ativos internacionais, use um CSV com:
+No "Setup do mes", suba o extrato mensal em PDF da XP International (Apex Clearing) e informe a cotacao USD/BRL do dia. O app extrai automaticamente:
 
-- `Classe`
-- `Ativo`
-- `Valor Atual (R$)`
+- As posicoes da secao `PORTFOLIO`, convertidas para BRL com a cotacao informada, e grava em `posicao_m0_xp_int_<mes>.csv` (mesmo formato `Classe,Ativo,Valor Atual (R$)` de antes, classe sempre `Ações no Exterior`) — nada muda no restante do pipeline.
+- Os pagamentos de dividendos (`CASH_DIVIDEND`) da secao `NON-TRADING ACTIVITY`, gravados em `dividendos_xp_int_<mes>.csv` (data, ativo, valor em USD e em BRL pela cotacao do dia). O relatorio usa esse historico para mostrar a renda passiva em dolar mes a mes na aba "Dividendos em dólar".
+- O PDF original tambem e guardado (`xp_int_original_<mes>.pdf`), para auditoria ou reprocessamento caso o parser evolua.
 
-Exemplo:
-
-```csv
-Classe,Ativo,Valor Atual (R$)
-Ações no Exterior,Apple,19962
-Ações no Exterior,Google,25483
-```
-
-Convencao recomendada de nomes:
-
-- `posicao_m0_xp_int_<YYYY-MM>.csv` (um mes por pasta; o MoM usa o arquivo `m0` do mes anterior)
-
-Templates prontos:
-
-- `clientes/gabriel/inputs/_templates/posicao_m0_internacional_template.csv`
+Enviar um novo extrato substitui o mes inteiro (posicao e dividendos).
 
 ## Estrutura
 

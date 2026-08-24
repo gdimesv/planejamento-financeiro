@@ -88,6 +88,7 @@
       <li><a href="#acoes" data-section="acoes">📈 Carteira de Ações</a></li>
       <li><a href="#novos" data-section="novos">🆕 Ativos novos</a></li>
       <li><a href="#fluxos" data-section="fluxos">💰 Fluxos</a></li>
+      <li><a href="#dividendos-exterior" data-section="dividendos-exterior">💵 Dividendos USD</a></li>
       <li><a href="#mom" data-section="mom">📆 Variação MoM</a></li>
       <li><a href="#macro" data-section="macro">🌐 Rentabilidade e macro</a></li>
     </ul>
@@ -110,6 +111,7 @@
         <a href="#acoes" data-section="acoes">📈 Carteira de Ações</a>
         <a href="#novos" data-section="novos">🆕 Ativos novos</a>
         <a href="#fluxos" data-section="fluxos">💰 Fluxos</a>
+        <a href="#dividendos-exterior" data-section="dividendos-exterior">💵 Dividendos USD</a>
         <a href="#mom" data-section="mom">📆 Variação MoM</a>
         <a href="#macro" data-section="macro">🌐 Rentabilidade e macro</a>
       </nav>
@@ -566,6 +568,71 @@
           </div>
           {% else %}
           <p class="note">Nenhuma transferência, aplicação/resgate de fundo ou operação em bolsa identificada no extrato deste mês.</p>
+          {% endif %}
+        </article>
+      </section>
+
+      <section class="section" id="dividendos-exterior" aria-label="Dividendos em dólar (XP International)">
+        <article class="card">
+          <h2>Dividendos em dólar (renda passiva no exterior)</h2>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Recebido no mês</div>
+              <div class="summary-value positive">{{ dividendos_usd.total_usd|usd }}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Acumulado no histórico</div>
+              <div class="summary-value positive">{{ historico_dividendos_usd.por_mes|sum(attribute='total_usd')|usd }}</div>
+            </div>
+          </div>
+
+          {% if historico_dividendos_usd.por_mes %}
+          <div class="cashflow-chart">
+            {% for linha in historico_dividendos_usd.por_mes %}
+            <div class="cashflow-row">
+              <div class="cashflow-date">{{ linha.mes }}</div>
+              <div class="cashflow-bars">
+                <div class="cashflow-negative"></div>
+                <div class="cashflow-positive">
+                  {% set gain_width = (linha.total_usd / historico_dividendos_usd.max_abs_mensal * 100) %}
+                  {% if linha.total_usd > 0 %}
+                  <span class="bar-gain" style="width: {{ gain_width }}%;"></span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="cashflow-net">{{ linha.total_usd|usd }}</div>
+            </div>
+            {% endfor %}
+            <div class="legend">
+              <span class="legend-gain">Dividendos recebidos</span>
+            </div>
+          </div>
+
+          <p class="dt-filter-note">Histórico mensal agregado a partir dos extratos da XP International disponíveis até {{ mes }}. A tabela abaixo detalha apenas os eventos do mês do relatório.</p>
+          <div class="table-wrap">
+            <table id="tabela-dividendos-exterior" class="display compact stripe" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Ativo</th>
+                  <th>Descrição</th>
+                  <th class="num">Valor (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for evento in dividendos_usd.eventos %}
+                <tr>
+                  <td>{{ evento.data }}</td>
+                  <td>{{ evento.ativo }}</td>
+                  <td>{{ evento.descricao }}</td>
+                  <td class="num" data-order="{{ evento.valor_usd }}">{{ evento.valor_usd|usd }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="note">Nenhum dividendo em dólar identificado ainda. Suba o extrato da XP International no setup do mês para começar a acompanhar.</p>
           {% endif %}
         </article>
       </section>
