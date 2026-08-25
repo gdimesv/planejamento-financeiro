@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from math import ceil
 from typing import Any
+
+from core.classification import CLASSES_EXTERIOR
 
 
 def _num(value: Any) -> float:
@@ -64,46 +65,19 @@ def _build_variation_chart(posicao: dict) -> list[dict]:
     return chart
 
 
-def _build_goal_cards(objetivos: list[dict], sugestoes: list[dict]) -> list[dict]:
-    sugestao_por_objetivo = {
-        str(row.get("objetivo_id")): _num(row.get("aporte_sugerido"))
-        for row in sugestoes
-    }
+def _build_goal_cards(objetivos: list[dict]) -> list[dict]:
     cards = []
     for goal in objetivos:
-        goal_id = str(goal.get("id"))
         progress = _num(goal.get("progresso_pct"))
         gap = _num(goal.get("gap"))
-        aporte = sugestao_por_objetivo.get(goal_id, 0.0)
         cards.append(
             {
                 **goal,
                 "progresso_visual": min(max(progress, 0.0), 100.0),
-                "aporte_sugerido": aporte,
-                "meses_estimados": ceil(gap / aporte) if gap > 0 and aporte > 0 else None,
                 "status": "Concluido" if gap <= 0 else "Em andamento",
             }
         )
-    return sorted(cards, key=lambda row: (_num(row.get("gap")) <= 0, -_num(row.get("aporte_sugerido"))))
-
-
-def _build_action_plan(sugestoes: list[dict], objetivos: list[dict]) -> list[dict]:
-    goal_by_id = {str(goal.get("id")): goal for goal in objetivos}
-    actions = []
-    for row in sugestoes:
-        goal = goal_by_id.get(str(row.get("objetivo_id")), {})
-        gap = _num(goal.get("gap"))
-        aporte = _num(row.get("aporte_sugerido"))
-        impact = (aporte / gap * 100.0) if gap > 0 else 0.0
-        actions.append(
-            {
-                **row,
-                "gap": gap,
-                "impacto_gap_pct": impact,
-                "motivo": "Maior gap ponderado pela prioridade do objetivo.",
-            }
-        )
-    return actions
+    return sorted(cards, key=lambda row: (_num(row.get("gap")) <= 0, -_num(row.get("gap"))))
 
 
 _ACAO_ORDER = [
@@ -159,7 +133,7 @@ def _build_recommendation_groups(rec: dict) -> list[dict]:
     return groups
 
 
-def _build_insights(payload: dict, allocation_chart: list[dict], action_plan: list[dict]) -> list[dict]:
+def _build_insights(payload: dict, allocation_chart: list[dict]) -> list[dict]:
     mom = payload.get("mom", {})
     rent = payload.get("rentabilidade", {})
     fluxos = payload.get("fluxos_extrato", {})
@@ -226,17 +200,7 @@ def _build_insights(payload: dict, allocation_chart: list[dict], action_plan: li
                 "tone": "negative",
             }
         )
-    if action_plan:
-        first = action_plan[0]
-        insights.append(
-            {
-                "label": "Próxima ação",
-                "title": str(first.get("descricao", "Aporte sugerido")),
-                "detail": "Principal destino sugerido para o aporte mensal.",
-                "tone": "neutral",
-            }
-        )
-    elif allocation_chart:
+    if allocation_chart:
         insights.append(
             {
                 "label": "Concentração",
@@ -272,23 +236,27 @@ def build_report_view_model(payload: dict) -> dict:
     posicao = payload.get("posicao", {})
     mom = payload.get("mom", {})
     rent = payload.get("rentabilidade", {})
-    fluxos = payload.get("fluxos_extrato", {})
+    dividendos = payload.get("dividendos", {})
     fluxos_externos = payload.get("fluxos_externos", {})
     objetivos = list(payload.get("objetivos", []))
-    sugestoes = list(payload.get("sugestoes", []))
 
     allocation_chart = _build_allocation_chart(posicao)
     variation_chart = _build_variation_chart(posicao)
-    goal_cards = _build_goal_cards(objetivos, sugestoes)
-    action_plan = _build_action_plan(sugestoes, objetivos)
+    goal_cards = _build_goal_cards(objetivos)
+
+    por_classe = posicao.get("por_classe", {})
+    total = _num(posicao.get("total"))
+    exterior_total = sum(_num(por_classe.get(c)) for c in CLASSES_EXTERIOR)
+    brasil_total = total - exterior_total
 
     kpis = [
         {
             "label": "Patrimônio total",
-            "value": _num(posicao.get("total")),
+            "value": total,
             "kind": "currency",
             "tone": "neutral",
             "context": "Mês atual",
+            "note": f"Brasil: {_format_currency(brasil_total)} · Exterior: {_format_currency(exterior_total)}",
         },
         {
             "label": "Variação mensal",
@@ -314,28 +282,20 @@ def build_report_view_model(payload: dict) -> dict:
             "context": "Saldo para decisões",
         },
         {
-            "label": "Proventos líquidos",
-            "value": _num(fluxos.get("liquido")),
+            "label": "Dividendos e proventos",
+            "value": _num(dividendos.get("mes_total_brl")),
             "kind": "currency",
-            "tone": _tone(_num(fluxos.get("liquido"))),
-            "context": "Ganhos menos custos",
-        },
-        {
-            "label": "Aporte sugerido",
-            "value": sum(_num(row.get("aporte_sugerido")) for row in sugestoes),
-            "kind": "currency",
-            "tone": "neutral",
-            "context": "Distribuído por objetivo",
+            "tone": _tone(_num(dividendos.get("mes_total_brl"))),
+            "context": "Brasil + Exterior, no mês",
         },
     ]
 
     return {
         "kpis": kpis,
-        "insights": _build_insights(payload, allocation_chart, action_plan),
+        "insights": _build_insights(payload, allocation_chart),
         "allocation_chart": allocation_chart,
         "variation_chart": variation_chart,
         "goal_cards": goal_cards,
-        "action_plan": action_plan,
         "recomendacoes_fii_groups": _build_recommendation_groups(payload.get("recomendacoes_fii", {})),
         "recomendacoes_acoes_groups": _build_recommendation_groups(payload.get("recomendacoes_acoes", {})),
     }

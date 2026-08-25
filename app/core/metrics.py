@@ -493,13 +493,20 @@ def classify_dividends_usd(df_dividendos: pd.DataFrame) -> Dict[str, object]:
 
     As linhas ja chegam identificadas (evento CASH_DIVIDEND do PDF), sem
     precisar de classificacao por palavra-chave como em classify_cashflows.
+    valor_brl usa a cotacao USD/BRL que o proprio usuario informou no upload
+    daquele mes (coluna ja gravada por save_internacional_from_pdf), nao uma
+    cotacao atual.
     """
-    empty = {"total_usd": 0.0, "eventos": []}
+    empty = {"total_usd": 0.0, "total_brl": 0.0, "eventos": []}
     if df_dividendos.empty or "valor_usd" not in df_dividendos.columns:
         return empty
 
     df = df_dividendos.copy()
     df["valor_usd"] = pd.to_numeric(df["valor_usd"], errors="coerce").fillna(0.0)
+    if "valor_brl" in df.columns:
+        df["valor_brl"] = pd.to_numeric(df["valor_brl"], errors="coerce").fillna(0.0)
+    else:
+        df["valor_brl"] = 0.0
 
     eventos = [
         {
@@ -507,6 +514,7 @@ def classify_dividends_usd(df_dividendos: pd.DataFrame) -> Dict[str, object]:
             "ativo": str(row.get("ativo", "")),
             "descricao": str(row.get("descricao", "")),
             "valor_usd": float(row["valor_usd"]),
+            "valor_brl": float(row["valor_brl"]),
         }
         for _, row in df.iterrows()
     ]
@@ -515,6 +523,7 @@ def classify_dividends_usd(df_dividendos: pd.DataFrame) -> Dict[str, object]:
 
     return {
         "total_usd": float(df["valor_usd"].sum()),
+        "total_brl": float(df["valor_brl"].sum()),
         "eventos": sorted(eventos, key=lambda e: str(e["data"]), reverse=True),
     }
 

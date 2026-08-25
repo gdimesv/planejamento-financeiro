@@ -24,10 +24,6 @@ def _percent(value: float | int | str) -> str:
     return f"{_format_pt_br_number(value)}%"
 
 
-def _currency_usd(value: float | int | str) -> str:
-    return f"US$ {_format_pt_br_number(value)}"
-
-
 def render_report(template_dir: Path, output_file: Path, payload: dict) -> None:
     reporting_dir = template_dir.parent
     css_file = reporting_dir / "static" / "report.css"
@@ -42,7 +38,6 @@ def render_report(template_dir: Path, output_file: Path, payload: dict) -> None:
     )
     env.filters["brl"] = _currency
     env.filters["pct"] = _percent
-    env.filters["usd"] = _currency_usd
     template = env.get_template("report.html.j2")
     html = template.render(**template_payload)
     output_file.parent.mkdir(parents=True, exist_ok=True)

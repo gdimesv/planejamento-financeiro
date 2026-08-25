@@ -8,6 +8,35 @@
   <style>{{ report_css|safe }}</style>
 </head>
 <body>
+  {% macro stacked_cashflow_chart(rows, max_abs) -%}
+  <div class="cashflow-chart">
+    {% for linha in rows %}
+    <div class="cashflow-row">
+      <div class="cashflow-date">{{ linha.mes }}</div>
+      <div class="cashflow-bars">
+        <div class="cashflow-negative">
+          {% for seg in linha.negative_segments %}
+          <span class="bar-segment" style="width: {{ (seg.valor / max_abs * 100) }}%; background-color: {{ seg.color }};" title="{{ seg.key }}: {{ seg.valor|brl }}"></span>
+          {% endfor %}
+        </div>
+        <div class="cashflow-positive">
+          {% for seg in linha.positive_segments %}
+          <span class="bar-segment" style="width: {{ (seg.valor / max_abs * 100) }}%; background-color: {{ seg.color }};" title="{{ seg.key }}: {{ seg.valor|brl }}"></span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="cashflow-net">{{ linha.variacao|default(linha.total_brl, true)|brl }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {%- endmacro %}
+  {% macro chart_legend(items, label_field) -%}
+  <div class="legend">
+    {% for item in items %}
+    <span class="legend-item"><span class="legend-swatch" style="background-color: {{ item.color }};"></span>{{ item[label_field] }}: {{ item.valor|brl }}</span>
+    {% endfor %}
+  </div>
+  {%- endmacro %}
   {% macro metric_value(item) -%}
     {%- if item.kind == "currency" -%}
       {{ item.value|brl }}
@@ -75,11 +104,12 @@
   {%- endmacro %}
 
   <div class="layout">
+    <a class="mobile-back-link" href="/setup/{{ cliente_id }}/{{ mes }}">← Voltar para o setup do mês</a>
     <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav-list">☰ Navegar pelo relatório</button>
     <ul class="mobile-nav-list" id="mobile-nav-list">
       <li><a href="#resumo" data-section="resumo">📊 Resumo</a></li>
       <li><a href="#leitura" data-section="leitura">🧭 Leitura do mês</a></li>
-      <li><a href="#plano" data-section="plano">✅ Plano de ação</a></li>
+      <li><a href="#evolucao-patrimonial" data-section="evolucao-patrimonial">📈 Evolução patrimonial</a></li>
       <li><a href="#objetivos" data-section="objetivos">🎯 Objetivos</a></li>
       <li><a href="#diagnostico" data-section="diagnostico">📈 Diagnóstico da carteira</a></li>
       <li><a href="#posicao" data-section="posicao">💼 Posição atual</a></li>
@@ -87,14 +117,14 @@
       <li><a href="#fiis" data-section="fiis">🏢 Carteira de FIIs</a></li>
       <li><a href="#acoes" data-section="acoes">📈 Carteira de Ações</a></li>
       <li><a href="#novos" data-section="novos">🆕 Ativos novos</a></li>
-      <li><a href="#fluxos" data-section="fluxos">💰 Fluxos</a></li>
-      <li><a href="#dividendos-exterior" data-section="dividendos-exterior">💵 Dividendos USD</a></li>
+      <li><a href="#dividendos" data-section="dividendos">💰 Dividendos</a></li>
+      <li><a href="#externos" data-section="externos">🔀 Aportes externos</a></li>
       <li><a href="#mom" data-section="mom">📆 Variação MoM</a></li>
-      <li><a href="#macro" data-section="macro">🌐 Rentabilidade e macro</a></li>
     </ul>
 
     <aside class="sidebar">
       <div class="sidebar-brand">
+        <a class="back-link" href="/setup/{{ cliente_id }}/{{ mes }}">← Voltar para o setup do mês</a>
         <p class="eyebrow">Relatório financeiro mensal</p>
         <h1>{{ cliente_nome }}</h1>
         <div class="sidebar-meta">Mês de referência <strong>{{ mes }}</strong></div>
@@ -102,7 +132,7 @@
       <nav class="sidebar-nav">
         <a href="#resumo" data-section="resumo">📊 Resumo</a>
         <a href="#leitura" data-section="leitura">🧭 Leitura do mês</a>
-        <a href="#plano" data-section="plano">✅ Plano de ação</a>
+        <a href="#evolucao-patrimonial" data-section="evolucao-patrimonial">📈 Evolução patrimonial</a>
         <a href="#objetivos" data-section="objetivos">🎯 Objetivos</a>
         <a href="#diagnostico" data-section="diagnostico">📈 Diagnóstico da carteira</a>
         <a href="#posicao" data-section="posicao">💼 Posição atual</a>
@@ -110,10 +140,9 @@
         <a href="#fiis" data-section="fiis">🏢 Carteira de FIIs</a>
         <a href="#acoes" data-section="acoes">📈 Carteira de Ações</a>
         <a href="#novos" data-section="novos">🆕 Ativos novos</a>
-        <a href="#fluxos" data-section="fluxos">💰 Fluxos</a>
-        <a href="#dividendos-exterior" data-section="dividendos-exterior">💵 Dividendos USD</a>
+        <a href="#dividendos" data-section="dividendos">💰 Dividendos</a>
+        <a href="#externos" data-section="externos">🔀 Aportes externos</a>
         <a href="#mom" data-section="mom">📆 Variação MoM</a>
-        <a href="#macro" data-section="macro">🌐 Rentabilidade e macro</a>
       </nav>
       <div class="sidebar-footer">Gerado localmente</div>
     </aside>
@@ -156,42 +185,31 @@
         </div>
       </section>
 
-      <section class="section" id="plano" aria-label="Plano de ação">
+      <section class="section" id="evolucao-patrimonial" aria-label="Evolução patrimonial">
         <div class="section-header">
-          <h2>Plano de ação</h2>
-          <div class="section-kicker">Decisões sugeridas para o próximo aporte.</div>
+          <h2>Evolução patrimonial</h2>
+          <div class="section-kicker">Variação do patrimônio total mês a mês, com o histórico disponível.</div>
         </div>
-        <div class="decision-grid">
-          <article class="callout accent">
-            <h3>Sugestão de investimento para o mês</h3>
-            {% if view.action_plan %}
-            <div class="action-list">
-              {% for s in view.action_plan %}
-              <div class="action-item">
-                <div>
-                  <div class="action-title">{{ s.descricao }}</div>
-                  <div class="action-meta">Prioridade {{ s.prioridade }} · impacto estimado de {{ s.impacto_gap_pct|pct }} no gap</div>
-                </div>
-                <div class="action-value">{{ s.aporte_sugerido|brl }}</div>
-              </div>
-              {% endfor %}
+        <article class="card">
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Patrimônio inicial</div>
+              <div class="summary-value neutral">{{ historico_patrimonio.patrimonio_inicial|brl }}</div>
             </div>
-            {% else %}
-            <p class="note">Nenhum aporte sugerido para este mês.</p>
-            {% endif %}
-          </article>
+            <div class="summary-item">
+              <div class="summary-label">Patrimônio final</div>
+              <div class="summary-value neutral">{{ historico_patrimonio.patrimonio_final|brl }}</div>
+            </div>
+          </div>
 
-          <article class="callout accent">
-            <h3>Movimentos planejados</h3>
-            <p class="note">Registre aqui os movimentos que pretende fazer após analisar este relatório.</p>
-            <form method="post" action="/report/{{ cliente_id }}/{{ mes }}/movimentos">
-              <textarea name="movimentos" rows="4" placeholder="Vender X ações de PETR4&#10;Comprar X ações de ITSA4">{{ movimentos_planejados }}</textarea>
-              <div style="margin-top:10px;">
-                <button type="submit">Salvar movimentos planejados</button>
-              </div>
-            </form>
-          </article>
-        </div>
+          {% if historico_patrimonio.variacao_por_mes %}
+          {{ stacked_cashflow_chart(historico_patrimonio.variacao_por_mes, historico_patrimonio.max_abs_mensal) }}
+          {{ chart_legend(historico_patrimonio.legend, "key") }}
+          <p class="dt-filter-note">Variação mensal do patrimônio total, quebrada por origem (Brasil ou Exterior).</p>
+          {% else %}
+          <p class="note">Ainda não há histórico de mais de um mês para montar a evolução.</p>
+          {% endif %}
+        </article>
       </section>
 
       <section class="section" id="objetivos" aria-label="Objetivos">
@@ -215,9 +233,6 @@
                 <span>{{ g.valor_atual_estimado|brl }} de {{ g.valor_alvo|brl }}</span>
                 <span>{{ g.progresso_pct|pct }} concluído</span>
                 <span>Gap: {{ g.gap|brl }}</span>
-                {% if g.aporte_sugerido > 0 %}
-                <span>Aporte: {{ g.aporte_sugerido|brl }}{% if g.meses_estimados %} · {{ g.meses_estimados }} meses{% endif %}</span>
-                {% endif %}
               </div>
             </div>
             {% endfor %}
@@ -446,85 +461,105 @@
         </article>
       </section>
 
-      <section class="section" id="fluxos" aria-label="Dividendos, proventos e custos">
+      <section class="section" id="dividendos" aria-label="Dividendos e proventos">
         <article class="card">
-          <h2>Dividendos, proventos e custos do extrato</h2>
+          <h2>Dividendos e proventos (Brasil + Exterior)</h2>
+          <p class="note">
+            Junta os proventos identificados no extrato da XP Brasil (dividendos, JCP, juros e rendimentos) com os
+            dividendos da XP International, convertidos para BRL pela cotação que você informou em cada mês.
+          </p>
           <div class="summary-grid">
             <div class="summary-item">
-              <div class="summary-label">Ganhos brutos</div>
-              <div class="summary-value positive">{{ fluxos_extrato.total_ganhos|brl }}</div>
+              <div class="summary-label">Recebido no mês</div>
+              <div class="summary-value positive">{{ dividendos.mes_total_brl|brl }}</div>
             </div>
             <div class="summary-item">
-              <div class="summary-label">Taxas e impostos</div>
-              <div class="summary-value negative">{{ fluxos_extrato.total_perdas|brl }}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Líquido</div>
-              <div class="summary-value">{{ fluxos_extrato.liquido|brl }}</div>
+              <div class="summary-label">Acumulado no histórico</div>
+              <div class="summary-value positive">{{ dividendos.acumulado_brl|brl }}</div>
             </div>
           </div>
 
-          {% if historico_fluxos.por_mes %}
-          <div class="cashflow-chart">
-            {% for linha in historico_fluxos.por_mes %}
-            <div class="cashflow-row">
-              <div class="cashflow-date">{{ linha.mes }}</div>
-              <div class="cashflow-bars">
-                <div class="cashflow-negative">
-                  {% set loss_width = ((linha.perdas|abs) / historico_fluxos.max_abs_mensal * 100) %}
-                  {% if linha.perdas < 0 %}
-                  <span class="bar-loss" style="width: {{ loss_width }}%;"></span>
-                  {% endif %}
+          {% if dividendos.historico_mensal %}
+          <div class="toggle-tabs" role="tablist" aria-label="Tipo de agrupamento do gráfico de dividendos">
+            <button type="button" class="toggle-tab is-active" data-dividendos-view="mensal">Sem agrupamento</button>
+            <button type="button" class="toggle-tab" data-dividendos-view="origem">Por origem</button>
+            <button type="button" class="toggle-tab" data-dividendos-view="ativo">Por ativo</button>
+          </div>
+
+          <div data-dividendos-panel="mensal">
+            <div class="cashflow-chart">
+              {% for linha in dividendos.historico_mensal %}
+              <div class="cashflow-row">
+                <div class="cashflow-date">{{ linha.mes }}</div>
+                <div class="cashflow-bars">
+                  <div class="cashflow-negative"></div>
+                  <div class="cashflow-positive">
+                    {% set gain_width = (linha.total_brl / dividendos.max_abs_mensal * 100) %}
+                    {% if linha.total_brl > 0 %}
+                    <span class="bar-gain" style="width: {{ gain_width }}%;"></span>
+                    {% endif %}
+                  </div>
                 </div>
-                <div class="cashflow-positive">
-                  {% set gain_width = (linha.ganhos / historico_fluxos.max_abs_mensal * 100) %}
-                  {% if linha.ganhos > 0 %}
-                  <span class="bar-gain" style="width: {{ gain_width }}%;"></span>
-                  {% endif %}
-                </div>
+                <div class="cashflow-net">{{ linha.total_brl|brl }}</div>
               </div>
-              <div class="cashflow-net">{{ linha.liquido|brl }}</div>
+              {% endfor %}
+              <div class="legend">
+                <span class="legend-gain">Dividendos e proventos recebidos por mês</span>
+              </div>
             </div>
-            {% endfor %}
-            <div class="legend">
-              <span class="legend-gain">Ganhos</span>
-              <span class="legend-loss">Taxas/impostos</span>
-            </div>
+            <p class="dt-filter-note">Histórico mensal a partir de todos os meses disponíveis (Brasil + Exterior combinados).</p>
           </div>
 
-          <p class="dt-filter-note">Histórico mensal agregado a partir dos extratos disponíveis até {{ mes }}. A tabela abaixo detalha apenas os eventos do mês do relatório.</p>
+          <div data-dividendos-panel="origem" hidden>
+            {{ stacked_cashflow_chart(dividendos.historico_mensal_origem, dividendos.max_abs_mensal) }}
+            {{ chart_legend(dividendos.por_carteira, "carteira") }}
+            <p class="dt-filter-note">Histórico mensal quebrado por origem (Brasil ou Exterior); legenda com o total acumulado de cada uma.</p>
+          </div>
+
+          <div data-dividendos-panel="ativo" hidden>
+            {{ stacked_cashflow_chart(dividendos.historico_mensal_ativo, dividendos.max_abs_mensal) }}
+            {{ chart_legend(dividendos.por_ativo, "ativo") }}
+            <p class="dt-filter-note">
+              Histórico mensal quebrado pelos 8 ativos que mais pagaram (acumulado); "Outros ativos" junta o restante,
+              incluindo proventos do extrato BR cujo ativo não foi possível identificar automaticamente na descrição.
+            </p>
+          </div>
+
+          <p class="dt-filter-note">A tabela abaixo detalha apenas os eventos do mês do relatório.</p>
           <div class="table-wrap">
-            <table id="tabela-fluxos" class="display compact stripe" style="width:100%">
+            <table id="tabela-dividendos" class="display compact stripe" style="width:100%">
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Tipo</th>
+                  <th>Origem</th>
                   <th>Ativo</th>
                   <th>Descrição</th>
-                  <th class="num">Valor</th>
+                  <th class="num">Valor (BRL)</th>
                 </tr>
               </thead>
               <tbody>
-              {% for evento in fluxos_extrato.eventos %}
+              {% for evento in dividendos.eventos_mes %}
                 <tr>
                   <td>{{ evento.data }}</td>
-                  <td>{{ evento.tipo }}</td>
+                  <td>{{ evento.origem }}</td>
                   <td>{{ evento.ativo }}</td>
                   <td>{{ evento.descricao }}</td>
-                  <td class="num" data-order="{{ evento.valor }}">{{ evento.valor|brl }}</td>
+                  <td class="num" data-order="{{ evento.valor_brl }}">{{ evento.valor_brl|brl }}</td>
                 </tr>
               {% endfor %}
               </tbody>
             </table>
           </div>
           {% else %}
-          <p class="note">Nenhum dividendo, provento, taxa ou imposto identificado no extrato deste mês.</p>
+          <p class="note">Nenhum dividendo ou provento identificado ainda.</p>
           {% endif %}
         </article>
+      </section>
 
+      <section class="section" id="externos" aria-label="Aportes e movimentações externas">
         <article class="card">
           <h2>Aportes e movimentações externas identificadas</h2>
-          <p class="note">Transferências, TEDs, aplicações/resgates de fundos e operações em bolsa encontrados no extrato do mês. Isso explica parte da variação de patrimônio que não é rentabilidade (ver aba Rentabilidade e macro).</p>
+          <p class="note">Transferências, TEDs, aplicações/resgates de fundos e operações em bolsa encontrados no extrato do mês. Isso explica parte da variação de patrimônio que não é rentabilidade.</p>
           {% if fluxos_externos.eventos %}
           <div class="summary-grid">
             <div class="summary-item">
@@ -568,71 +603,6 @@
           </div>
           {% else %}
           <p class="note">Nenhuma transferência, aplicação/resgate de fundo ou operação em bolsa identificada no extrato deste mês.</p>
-          {% endif %}
-        </article>
-      </section>
-
-      <section class="section" id="dividendos-exterior" aria-label="Dividendos em dólar (XP International)">
-        <article class="card">
-          <h2>Dividendos em dólar (renda passiva no exterior)</h2>
-          <div class="summary-grid">
-            <div class="summary-item">
-              <div class="summary-label">Recebido no mês</div>
-              <div class="summary-value positive">{{ dividendos_usd.total_usd|usd }}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Acumulado no histórico</div>
-              <div class="summary-value positive">{{ historico_dividendos_usd.por_mes|sum(attribute='total_usd')|usd }}</div>
-            </div>
-          </div>
-
-          {% if historico_dividendos_usd.por_mes %}
-          <div class="cashflow-chart">
-            {% for linha in historico_dividendos_usd.por_mes %}
-            <div class="cashflow-row">
-              <div class="cashflow-date">{{ linha.mes }}</div>
-              <div class="cashflow-bars">
-                <div class="cashflow-negative"></div>
-                <div class="cashflow-positive">
-                  {% set gain_width = (linha.total_usd / historico_dividendos_usd.max_abs_mensal * 100) %}
-                  {% if linha.total_usd > 0 %}
-                  <span class="bar-gain" style="width: {{ gain_width }}%;"></span>
-                  {% endif %}
-                </div>
-              </div>
-              <div class="cashflow-net">{{ linha.total_usd|usd }}</div>
-            </div>
-            {% endfor %}
-            <div class="legend">
-              <span class="legend-gain">Dividendos recebidos</span>
-            </div>
-          </div>
-
-          <p class="dt-filter-note">Histórico mensal agregado a partir dos extratos da XP International disponíveis até {{ mes }}. A tabela abaixo detalha apenas os eventos do mês do relatório.</p>
-          <div class="table-wrap">
-            <table id="tabela-dividendos-exterior" class="display compact stripe" style="width:100%">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Ativo</th>
-                  <th>Descrição</th>
-                  <th class="num">Valor (USD)</th>
-                </tr>
-              </thead>
-              <tbody>
-              {% for evento in dividendos_usd.eventos %}
-                <tr>
-                  <td>{{ evento.data }}</td>
-                  <td>{{ evento.ativo }}</td>
-                  <td>{{ evento.descricao }}</td>
-                  <td class="num" data-order="{{ evento.valor_usd }}">{{ evento.valor_usd|usd }}</td>
-                </tr>
-              {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <p class="note">Nenhum dividendo em dólar identificado ainda. Suba o extrato da XP International no setup do mês para começar a acompanhar.</p>
           {% endif %}
         </article>
       </section>
@@ -692,43 +662,6 @@
         </article>
       </section>
 
-      <section class="section" id="macro" aria-label="Rentabilidade e macro">
-        <div class="analytics-grid">
-          <article class="card">
-            <h2>Rentabilidade da carteira</h2>
-            <div class="summary-grid">
-              <div class="summary-item">
-                <div class="summary-label">Resultado do mês</div>
-                <div class="summary-value {{ 'positive' if rentabilidade.resultado_mes > 0 else 'negative' if rentabilidade.resultado_mes < 0 else 'neutral' }}">{{ rentabilidade.resultado_mes|brl }}</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Rentabilidade estimada</div>
-                <div class="summary-value {{ 'positive' if rentabilidade.rentabilidade_pct > 0 else 'negative' if rentabilidade.rentabilidade_pct < 0 else 'neutral' }}">{{ rentabilidade.rentabilidade_pct|pct }}</div>
-              </div>
-            </div>
-          </article>
-
-          <article class="card">
-            <h2>Análise macroeconômica</h2>
-            <div class="table-wrap">
-              <table>
-                <tr>
-                  <th>Indicador</th>
-                  <th>Valor</th>
-                  <th>Comentário</th>
-                </tr>
-                {% for m in macro %}
-                <tr>
-                  <td>{{ m.indicador }}</td>
-                  <td>{{ m.valor }}</td>
-                  <td>{{ m.comentario }}</td>
-                </tr>
-                {% endfor %}
-              </table>
-            </div>
-          </article>
-        </div>
-      </section>
     </main>
   </div>
 
@@ -795,7 +728,7 @@
           });
         }
       });
-      $('#tabela-fluxos').DataTable({
+      $('#tabela-dividendos').DataTable({
         order: [[0, 'desc']],
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'Todos']],
@@ -856,6 +789,26 @@
 
       sections.forEach(function (section) {
         observer.observe(section);
+      });
+    })();
+  </script>
+
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll('[data-dividendos-view]');
+      var panels = document.querySelectorAll('[data-dividendos-panel]');
+      if (!tabs.length || !panels.length) return;
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          var view = tab.getAttribute('data-dividendos-view');
+          tabs.forEach(function (t) {
+            t.classList.toggle('is-active', t === tab);
+          });
+          panels.forEach(function (panel) {
+            panel.hidden = panel.getAttribute('data-dividendos-panel') !== view;
+          });
+        });
       });
     })();
   </script>

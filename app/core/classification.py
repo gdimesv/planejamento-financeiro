@@ -6,6 +6,9 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+# Unicas classes hoje originadas da posicao internacional (extrato XP International).
+CLASSES_EXTERIOR = ("Ações no Exterior",)
+
 
 def _load_rules(path: Path) -> dict:
     if not path.exists():

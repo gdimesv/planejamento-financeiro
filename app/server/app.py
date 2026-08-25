@@ -11,7 +11,7 @@ if str(APP_DIR) not in sys.path:
 
 import yaml
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -20,12 +20,10 @@ from pipeline.gate import evaluate_gate
 from pipeline.goals import (
     load_asset_map,
     load_ativos_mes,
-    load_aporte_usado,
     load_objetivos,
     save_asset_map,
     save_aporte_usado,
     save_objetivos,
-    save_planned_moves,
 )
 from pipeline.orchestrator import save_internacional_from_pdf
 from pipeline.state import (
@@ -135,20 +133,6 @@ def serve_report(cliente: str, mes: str) -> FileResponse:
     if not html_path.exists():
         raise HTTPException(404, "Relatorio ainda nao gerado para este mes.")
     return FileResponse(html_path, media_type="text/html")
-
-
-@app.post("/report/{cliente}/{mes}/movimentos")
-def report_movimentos(cliente: str, mes: str, movimentos: str = Form("")):
-    from main import run as run_report
-
-    save_planned_moves(cliente, mes, movimentos)
-    output_file = client_dir(cliente) / "outputs" / mes / "relatorio.html"
-    if output_file.exists():
-        aporte = load_aporte_usado(cliente, mes)
-        if aporte is None:
-            aporte = _aporte_default(cliente)
-        run_report(cliente, mes, aporte)
-    return RedirectResponse(f"/report/{cliente}/{mes}", status_code=303)
 
 
 # --- Helpers de listagem ---

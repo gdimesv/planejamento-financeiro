@@ -5,13 +5,6 @@ from typing import Dict, List
 import pandas as pd
 
 
-PRIORITY_WEIGHT = {
-    "alta": 1.5,
-    "media": 1.0,
-    "baixa": 0.7,
-}
-
-
 def build_goal_allocation(df_positions: pd.DataFrame, mapping_df: pd.DataFrame) -> Dict[str, float]:
     if df_positions.empty or mapping_df.empty:
         return {}
@@ -105,34 +98,3 @@ def evaluate_goals(
         )
 
     return evaluated
-
-
-def suggest_monthly_investment(goal_statuses: List[dict], monthly_budget: float) -> List[dict]:
-    if monthly_budget <= 0:
-        return []
-
-    weighted = []
-    for g in goal_statuses:
-        if g["gap"] <= 0:
-            continue
-        weight = PRIORITY_WEIGHT.get(g.get("prioridade", "media"), 1.0)
-        weighted_gap = g["gap"] * weight
-        weighted.append((g, weighted_gap))
-
-    total_weighted_gap = sum(item[1] for item in weighted)
-    if total_weighted_gap == 0:
-        return []
-
-    suggestions = []
-    for goal, w_gap in weighted:
-        allocation = monthly_budget * (w_gap / total_weighted_gap)
-        suggestions.append(
-            {
-                "objetivo_id": goal["id"],
-                "descricao": goal["descricao"],
-                "prioridade": goal["prioridade"],
-                "aporte_sugerido": float(allocation),
-            }
-        )
-
-    return sorted(suggestions, key=lambda x: x["aporte_sugerido"], reverse=True)
