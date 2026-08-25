@@ -19,10 +19,6 @@ def allocation_file(cliente_id: str) -> Path:
     return client_dir(cliente_id) / "config" / "asset_objective_map.csv"
 
 
-def planned_moves_file(cliente_id: str, mes: str) -> Path:
-    return client_dir(cliente_id) / "planos" / mes / "movimentos.md"
-
-
 def aporte_usado_file(cliente_id: str, mes: str) -> Path:
     return client_dir(cliente_id) / "planos" / mes / "aporte_usado.txt"
 
@@ -83,17 +79,6 @@ def load_ativos_mes(cliente_id: str, mes: str) -> pd.DataFrame:
     )
 
 
-def load_planned_moves(cliente_id: str, mes: str) -> str:
-    path = planned_moves_file(cliente_id, mes)
-    return path.read_text(encoding="utf-8") if path.exists() else ""
-
-
-def save_planned_moves(cliente_id: str, mes: str, content: str) -> Path:
-    path = planned_moves_file(cliente_id, mes)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = content.strip()
-    path.write_text(content + ("\n" if content else ""), encoding="utf-8")
-    return path
 
 
 def load_aporte_usado(cliente_id: str, mes: str) -> float | None:
